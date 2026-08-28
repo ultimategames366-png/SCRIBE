@@ -19,6 +19,18 @@ Build artifacts go to `binary/` (not `build/`). The main app lives under `apps/d
 
 There are no automated tests — the project relies on manual testing.
 
+### SCRIBE-specific notes
+
+- The startup splash screen was removed: `qml/dialogs/SplashScreen.qml` no longer exists and
+  `AppInitStateMachine.qml` goes from `s5LegacyMigration` straight to `s7HomeOrFile` /
+  `s8LoginRequired`. Do not reintroduce startup dialogs before the main window is up.
+- Startup network calls are deferred/offline-safe: `AutoUpdate` checks 60s after launch and
+  skips when offline; `UserGuideSearchIndex` loads its cached index immediately and defers
+  the remote refresh; `SubscriptionPlanOperations.loadTaxonomy()` retries with progressive
+  backoff (cap 10 min).
+- Account/subscription flows talk to the real Scrite services and must keep doing so; do not
+  bypass or fake entitlements.
+
 ## Code Formatting
 
 Uses clang-format with Qt's coding style (WebKit base). Key rules:

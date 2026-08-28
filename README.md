@@ -1,28 +1,67 @@
-# Scrite
+# SCRIBE
 
-Scrite is an open-source desktop screenwriting app. Its an offline app, with no built-in cloud
-syncing. You can find more information on our [official website](https://www.scrite.io).
+SCRIBE is an offline-first desktop screenwriting application. It is built on the
+[Scrite](https://github.com/teriflix/scrite) codebase (GPLv3), integrated and tuned in this
+repository so that writing, structuring and managing screenplays works fully on your local
+machine — with no startup splash screen, no blocking network calls at launch, and graceful
+behaviour when you are offline.
 
-<img src="./apps/desktop/images/scrite_logo_for_report_header.png" alt="Scrite Logo" width="320"/>
+<img src="./docs/screenshots/preview.png" alt="Preview" width="720"/>
 
 ## Features
+
 - Create screenplays and format elements appropriately.
 - Type in multiple Indian and International languages.
 - Import screenplays from FinalDraft and HTML formats.
 - Export screenplays to PDF, FinalDraft, Text and HTML formats.
 - Generate Character and Location Reports
 - Capture character and scene notes.
+- Structure board, timeline, notebook, snapshots/backup history and more.
 
-A complete user guide can be found [here](https://www.scrite.io/docs/userguide).
+A complete user guide (from the upstream project) can be found
+[here](https://www.scrite.io/docs/userguide); its sources live in `docs/userguide`.
 
-<img src="./docs/screenshots/banner.jpeg" alt="Banner" width="720"/>
+## Local-first / offline behaviour
+
+SCRIBE starts fast and stays usable without an Internet connection:
+
+- **No splash screen.** The startup splash/flash dialog was removed completely. The
+  application window appears directly on launch. (See
+  `apps/desktop/qml/init/AppInitStateMachine.qml`.)
+- **No startup network calls on the critical path.** Optional background services were
+  deferred or made offline-safe:
+  - The *check for updates* REST call now runs 60s after launch and is skipped entirely
+    while the machine is offline (`apps/desktop/src/core/autoupdate.cpp`).
+  - The *user-guide search index* is loaded from the local cache immediately; the remote
+    index refresh is deferred and fails silently offline
+    (`apps/desktop/src/core/userguidesearchindex.cpp`).
+  - The *subscription plan taxonomy* fetch backs off progressively (up to 10 minutes)
+    instead of retrying every 500 ms when offline
+    (`apps/desktop/qml/globals/SubscriptionPlanOperations.qml`).
+- **Creating, opening, saving, editing, importing and exporting screenplays are all local
+  operations** and never require a network connection. `.scrite` project files are ZIP
+  archives written and read entirely on disk.
+- **Crash reporting (Google Crashpad) is an opt-in build option** and is OFF by default
+  (`SCRITE_WITH_CRASHPAD`). Nothing is sent anywhere by default.
+
+### What still requires the Scrite services
+
+Upstream Scrite pairs the desktop app with its own web services for **user accounts,
+subscription entitlement and purchases**. SCRIBE deliberately does **not** bypass, fake or
+circumvent that server-side authorisation:
+
+- If you sign in, sign-in/activation/purchase flows talk to the real Scrite services and
+  need connectivity.
+- A signed-in session is cached locally, so a signed-in user can keep working offline.
+- All other features — the entire screenwriting workflow — work without an account.
 
 ## Building from source
-Scrite is developed using Qt 6.11. To build Scrite, install Qt 6.11+ on your computer (Windows,
+
+SCRIBE is developed using Qt 6.11. To build it, install Qt 6.11+ on your computer (Windows,
 macOS, or Linux) and CMake 3.27+.
 
-Open the project in Qt Creator (it auto-detects CMakeLists.txt) and set the build configuration to
-**Release**, or build from the command line:
+Open the project in Qt Creator (it auto-detects CMakeLists.txt) and set the build
+configuration to **Release**, or build from the command line:
 
 ```bash
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
@@ -31,14 +70,56 @@ cmake --build build --config Release
 
 Build artifacts are placed in the `binary/` directory.
 
-## Reporting Issues
-If you run into bugs, crashes or find missing features OR features that are not working as expected,
-we recommend that you post a message on our Discord server, discuss it with us there before creating
-a bug ticket on GitHub.
+All third-party libraries (KDE Sonnet, QuaZip, OpenXLSX, ECM, sanscript.js and others) are
+vendored under `thirdparty/`, so no git submodules need to be initialised.
 
-Here is a link to our Discord server: https://discord.gg/bGHquFX5jK
+### Platform notes (from upstream Scrite)
 
-## Conference Talks based on Scrite
+#### Windows
+Ensure that you have OpenSSL 3 installed. Windows 10+ is supported.
+
+#### macOS
+Any version of macOS supported by Qt 6.11 should work. Builds are universal binaries
+(x86_64 + arm64).
+
+#### Linux
+- Hunspell (spellcheck): `sudo apt-get install libhunspell-dev`
+- Runtime libs: `sudo apt install libxcb-cursor0 libxcb-xinerama0`
+- OpenSSL 3: `sudo apt install libssl-dev`
+- Language support (transliteration) requires IBUS:
+  `sudo apt install ibus ibus-m17n libibus-1.0-dev`, then set up languages with
+  `ibus-setup`.
+
+## Documentation site (mkdocs)
+
+To build/serve the bundled user guide:
+
+```bash
+cd docs/userguide
+pip install mkdocs mkdocs-material mkdocs-video
+python -m mkdocs serve   # then open http://127.0.0.1:8000
+```
+
+## Reporting issues
+
+Please report SCRIBE integration issues in this repository's issue tracker. Upstream Scrite
+development happens at https://github.com/teriflix/scrite (community discussions on their
+Discord server: https://discord.gg/bGHquFX5jK).
+
+## License and attribution
+
+SCRIBE is based on [Scrite](https://github.com/teriflix/scrite) by Teriflix / IEDN
+Technologies Pvt. Ltd. and contributors. The Scrite source code is licensed under the
+**GNU General Public License v3**; the full license text, copyright notices, the commercial
+binary-license notice for official Scrite releases, and third-party license information are
+preserved verbatim in [LICENSE.txt](./LICENSE.txt). The vendored third-party libraries under
+`thirdparty/` retain their own license files.
+
+If you redistribute SCRIBE in source or binary form, the GPLv3 obligations described in
+LICENSE.txt apply.
+
+## Conference Talks based on the Scrite codebase
+
 These talks may help you find your way around the code.
 
 - Solving Problems for Yourself, and Accidentally Thousands More - [IndiaFOSS
@@ -46,137 +127,3 @@ These talks may help you find your way around the code.
 - Closing The Gaps - QML on the Desktop - [Qt DevCon 2022](https://youtu.be/tyn90zQZTEg)
 - Building Beautiful Desktop Apps Using QML - [Qt DevDes Days 2021](https://youtu.be/zQAGs8cuGv8)
 - Insights from Building Scrite Using QML - [Qt Desktop Days 2020](https://youtu.be/z7GEUrRyh0U)
-
-## Tutorials and Walkthoughs
-
-- [Guided Tour of Scrite, Sep 2022](https://youtu.be/Web6WEj56wo)
-- [Generating the Statistics Report](https://youtu.be/qp8ZSYI8Z_w)
-- [Using Custom Story Beats](https://youtu.be/Ql_BjMVpjNc)
-- [Typing in Multiple Indian Languages](https://youtu.be/Ts1PFvemaIw)
-
-## Reviews
-
-- [ScreenwritingScribe reviews Scrite, Jan 2025](https://www.youtube.com/watch?v=8PXrQ6DUw9o)
-- [Sarvana from Film Psychology reviews Scrite, in
-  Tamil](https://www.youtube.com/watch?v=ipWjr_33iIk)
-- [Rahul, Pooja of Paramvah Studios talk about their Film and Scrite](https://youtu.be/niG2X6nCYCA)
-- [Nhân Trương reviews Scrite, in Vietnamese](https://www.youtube.com/watch?v=oY4kQrzIgvU)
-- [James K Martin reviews Scrite](https://www.youtube.com/watch?v=_JkTx75oVbE)
-
-## Special Thanks
-
-<a href="https://www.scrite.io/fossunited-grants/" target="_blank">
-<img src="./resources/sponsored-by-fugrants.png" alt="Sponsored by FOSSUnited" width="160"/>
-</a>
-
-[Grant Funding (2026)](https://www.scrite.io/fossunited-grants/): Covering essential expenses 
-related to server hosting, software licensing, code signing certificates, and legal document 
-reviews.
-
-## Dependencies
-
-### mkdocs
-If you want to generate documentation from the docs folder, you will also need to install Python and
-mkdocs.
-
-#### On macOS
-
-Most users prefer to install python from homebrew on macOS. In such cases, it works best if a
-separate environment is created for serving docs.
-
-    # Switch to docs/userguide
-    cd ./docs/userguide
-
-    # Fresh Homebrew Python (ensures pip works)
-    brew install python
-
-    # Project-specific virtualenv (isolates from system)
-    cd your-scrite-docs-folder
-    python3 -m venv venv
-    source venv/bin/activate
-
-    # Install MkDocs ecosystem
-    pip install mkdocs mkdocs-material mkdocs-video mkdocs-rss-plugin
-
-    # Serve docs
-    mkdocs serve --livereload
-
-    # Open http://127.0.0.1:8000 on your browser
-
-#### On Windows & Linux
-
-Once you have python and pip installed,
-
-    # Switch to docs/userguide
-    cd ./docs/userguide
-
-    # Install Mkdocs ecosystem
-    pip install mkdocs mkdocs-material mkdocs-video
-
-    # Serve docs
-    python -m mkdocs serve
-
-    # Open http://127.0.0.1:8000 on your browser
-
-Further reading: https://www.mkdocs.org/user-guide/installation/
-
-### Qt
-We use a commercial license of Qt 6.11 for all production and beta builds. You should be able to use
-any Qt 6.11+ release for building Scrite. The code is organized to work well with our webservices in
-production, so if you build from the source code here — it may not work with our production servers.
-You should be able to comment away all references to our webservices and construct a purely
-open-source build. At some point, we will introduce compile time config settings to make this easy.
-
-### Windows
-Ensure that you have OpenSSL 3 installed. We use Windows 11 for development, although the app also
-works on Windows 10. Earlier versions of Windows are not supported.
-
-### macOS
-Any version of macOS supported by Qt 6.11 should work. macOS builds are universal binaries (x86_64 +
-arm64).
-
-### Linux
-To build the app on Linux, there are a couple of dependencies to take care of first.
-
-#### Hunspell (for spellcheck)
-To build Scrite with Hunspell support on Linux, install hunspell-dev. On Ubuntu:
-
-    sudo apt-get install libhunspell-dev
-
-#### xcb and xinerama
-Make sure that you have cursor, xinerama installed
-
-    sudo apt install libxcb-cursor0 libxcb-xinerama0
-
-#### OpenSSL
-You will also need OpenSSL 3:
-
-    sudo apt install libssl-dev
-
-#### imagemagick
-For running the package scripts, you will need imagemagick and linuxdeployqt
-
-    sudo apt install imagemagick
-
-#### linuxdeployqt (for packaging)
-    wget -c https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
-
-#### lib-ibus-1.0 for Language support
-Language support on Linux requirres IBUS.
-
-    sudo apt install ibus ibus-m17n libibus-1.0-dev
-
-Additionally, ensure that ibus daemon is running and that you setup languages using
-
-    ibus-setup
-
-You may also need to include the following lines into environment variables.
-
-    export GTK_IM_MODULE=ibus
-    export XMODIFIERS=@im=ibus
-    export QT_IM_MODULE=ibus
-    export XIM_PROGRAM="/usr/bin/ibus-daemon -drx"
-
-## Screenshots
-
-<img src="./docs/screenshots/preview.png" alt="Preview" width="720"/>
