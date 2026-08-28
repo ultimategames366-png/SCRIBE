@@ -1,0 +1,276 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+import "../helpers"
+import "../dialogs"
+import "../notifications"
+
+VclMenu {
+    id: root
+
+    property string innerTitle: ""
+    property SceneGroup sceneGroup: null
+
+    signal toggled(int row, string name)
+
+    width: 450
+    height: 500
+
+    title: "Tag Groups"
+    autoWidth: false
+    enabled: !Scrite.document.readOnly
+    closePolicy: Popup.CloseOnEscape|Popup.CloseOnPressOutside
+
+    HelpTipNotification {
+        id: _htn
+
+        tipName: "story_beat_tagging"
+        enabled: false
+    }
+
+    VclMenuItem {
+        width: root.width
+        height: root.height
+
+        background: Item { }
+
+        contentItem: Item {
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.bottomMargin: root.bottomPadding
+
+                spacing: 10
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    color: Qt.rgba(0,0,0,0)
+                    border.width: 1
+                    border.color: Runtime.colors.primary.borderColor
+
+                    enabled: Runtime.appFeatures.structure.enabled && root.sceneGroup.sceneCount > 0
+                    opacity: enabled ? 1 : 0.5
+
+                    VclLabel {
+                        id: _innerTitleText
+
+                        anchors.top: parent.top
+                        anchors.margins: 3
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        width: parent.width - 8
+                        visible: text !== ""
+                        wrapMode: Text.WordWrap
+
+                        text: {
+                            let ret = root.innerTitle
+                            if(root.sceneGroup.hasSceneStackIds) {
+                                if(ret !== "")
+                                    ret += "<br/>"
+                                ret += "<font size=\"-2\"><i>All scenes in the selected stack(s) are going to be tagged.</i></font>"
+                            }
+                            return ret;
+                        }
+
+                        font.bold: true
+                        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+                        color: Runtime.colors.primary.c700.text
+                        padding: 5
+                        horizontalAlignment: Text.AlignHCenter
+
+                        background: Rectangle {
+                            color: Runtime.colors.primary.c700.background
+                        }
+                    }
+
+                    ListView {
+                        id: _groupsView
+
+                        property bool scrollBarVisible: _groupsView.height < _groupsView.contentHeight
+                        property bool showingFilteredItems: root.sceneGroup.hasSceneActs && root.sceneGroup.hasGroupActs
+
+                        function adjustScrolling() {
+                            if(!showingFilteredItems) {
+                                positionViewAtBeginning()
+                                return
+                            }
+
+                            let prefCategory = Scrite.document.structure.preferredGroupCategory
+
+                            let acts = root.sceneGroup.sceneActs
+                            let index = -1
+                            for(let i=0; i<root.sceneGroup.count; i++) {
+                                let item = root.sceneGroup.at(i)
+
+                                if(item.category.toUpperCase() !== prefCategory)
+                                    continue
+
+                                if( item.act === "" || acts.indexOf(item.act) >= 0) {
+                                    positionViewAtIndex(i, ListView.Beginning)
+                                    return
+                                }
+                            }
+                        }
+
+                        function adjustScrollingLater() {
+                            Runtime.execLater(_groupsView, 50, adjustScrolling)
+                        }
+
+                        ScrollBar.vertical: VclScrollBar { flickable: _groupsView }
+                        FlickScrollSpeedControl.factor: Runtime.workspaceSettings.flickScrollSpeedFactor
+
+                        anchors.left: parent.left
+                        anchors.top: _innerTitleText.visible ? _innerTitleText.bottom : parent.top
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: 5
+
+                        clip: true
+                        model: root.sceneGroup
+                        keyNavigationEnabled: false
+                        boundsBehavior: ListView.StopAtBounds
+                        boundsMovement: ListView.StopAtBounds
+
+                        section.property: "category"
+                        section.criteria: ViewSection.FullString
+                        section.delegate: Rectangle {
+                            required property string section
+
+                            width: _groupsView.width - (_groupsView.scrollBarVisible ? 20 : 1)
+                            height: 30
+                            color: Runtime.colors.primary.windowColor
+
+                            VclLabel {
+                                id: _categoryLabel
+
+                                anchors.centerIn: parent
+
+                                bottomPadding: 5
+                                color: Runtime.colors.primary.button.text
+                                text: parent.section
+                                topPadding: 5
+
+                                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                            }
+                        }
+
+                        delegate: Rectangle {
+                            id: _groupsViewDelegate
+
+                            required property int index
+                            required property var arrayItem
+
+                            property bool doesNotBelongToAnyAct: arrayItem.act === ""
+                            property bool filtered: doesNotBelongToAnyAct || root.sceneGroup.sceneActs.indexOf(arrayItem.act) >= 0
+
+                            width: _groupsView.width - (_groupsView.scrollBarVisible ? 20 : 1)
+                            height: 30
+
+                            color: groupItemMouseArea.containsMouse ? Runtime.colors.primary.button.background : Qt.rgba(0,0,0,0)
+                            opacity: _groupsView.showingFilteredItems ? (filtered ? 1 : 0.5) : 1
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+
+                                spacing: 5
+
+                                Image {
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: 24; height: 24
+
+                                    source: Runtime.themedIcon("qrc:/icons/navigation/check.png")
+                                    opacity: {
+                                        switch(_groupsViewDelegate.arrayItem.checked) {
+                                        case "no": return 0
+                                        case "partial": return 0.25
+                                        case "yes": return 1
+                                        }
+                                        return 0
+                                    }
+                                }
+
+                                VclLabel {
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: parent.width - parent.spacing - 24
+
+                                    text: _groupsViewDelegate.arrayItem.label
+                                    elide: Text.ElideRight
+                                    leftPadding: _groupsViewDelegate.arrayItem.type > 0 ? 20 : 0
+
+                                    font.bold: _groupsView.showingFilteredItems ? _groupsViewDelegate.filtered :_groupsViewDelegate.doesNotBelongToAnyAct
+                                    font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                                }
+                            }
+
+                            MouseArea {
+                                id: groupItemMouseArea
+
+                                anchors.fill: parent
+
+                                hoverEnabled: true
+
+                                onClicked: {
+                                    Runtime.undoMacro("Tag Story Beat", () => {
+                                                          root.sceneGroup.toggle(_groupsViewDelegate.index)
+                                                          root.toggled(_groupsViewDelegate.index, _groupsViewDelegate.arrayItem.name)
+                                                      })
+                                    const data = Scrite.document.structure.isBuiltInGroup(_groupsViewDelegate.arrayItem.name) ?
+                                                   "tag: " + _groupsViewDelegate.arrayItem.name : "tag: custom-story-beat"
+                                    Scrite.user.logActivity2("structure", data)
+                                }
+                            }
+                        }
+
+                        onShowingFilteredItemsChanged: adjustScrollingLater()
+                    }
+                }
+
+                VclButton {
+                    Layout.alignment: Qt.AlignRight
+
+                    text: "Customise"
+                    onClicked: StructureStoryBeatsDialog.launch()
+                }
+            }
+
+            DisabledFeatureNotice {
+                anchors.fill: parent
+
+                visible: !Runtime.appFeatures.structure.enabled
+                featureName: "Structure Tagging"
+
+                onClicked: root.close()
+            }
+        }
+    }
+
+    onOpened: _htn.enabled = true
+}

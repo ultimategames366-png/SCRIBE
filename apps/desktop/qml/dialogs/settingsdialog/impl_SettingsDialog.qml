@@ -1,0 +1,124 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../../globals"
+import "../../controls"
+import "../../helpers"
+
+VclDialog {
+    id: root
+
+    property string activeTab
+
+    title: "Settings"
+    width: Math.min(Scrite.window.width-80, 1049)
+    height: Math.min(Scrite.window.height-80, 750)
+
+    content: ColumnLayout {
+        spacing: 0
+
+        Component.onCompleted: {
+            if(root.activeTab !== "") {
+                for(let i=0; i<_tabBar.count; i++) {
+                    const tab = _tabBar.itemAt(i) as TabButton
+                    if(tab.text === root.activeTab) {
+                        _tabBar.currentIndex = i
+                        break
+                    }
+                }
+            }
+        }
+
+        TabBar {
+            id: _tabBar
+
+
+            Layout.fillWidth: true
+
+            TabButton {
+                text: "Application"
+                font: Runtime.idealFontMetrics.font
+            }
+
+            TabButton {
+                text: "Structure"
+                font: Runtime.idealFontMetrics.font
+            }
+
+            TabButton {
+                text: "Screenplay"
+                font: Runtime.idealFontMetrics.font
+            }
+
+            TabButton {
+                text: "Notebook"
+                font: Runtime.idealFontMetrics.font
+            }
+
+            TabButton {
+                text: "Language"
+                font: Runtime.idealFontMetrics.font
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            color: Runtime.colors.primary.c50.background
+
+            Action {
+                property int nextIndex: (_tabBar.currentIndex+1)%_tabBar.count
+                shortcut: ActionHub.applicationOptions.find("tabRight").shortcut
+
+                onTriggered: () => {
+                    _tabBar.setCurrentIndex(nextIndex)
+                }
+            }
+
+            Action {
+                property int prevIndex: (_tabBar.currentIndex-1) < 0 ? _tabBar.count-1 : (_tabBar.currentIndex-1)
+                shortcut: ActionHub.applicationOptions.find("tabLeft").shortcut
+
+                onTriggered: () => {
+                    _tabBar.setCurrentIndex(prevIndex)
+                }
+            }
+
+            Loader {
+                anchors.fill: parent
+
+                property real pageListWidth: (width/_tabBar.count)
+
+                source: "./" + _tabBar.currentItem.text + "SettingsTab.qml"
+                onItemChanged: {
+                    if(item) {
+                        item.pageListWidth = Qt.binding( () => { return pageListWidth } )
+
+                        Runtime.showHelpTip("settings" + _tabBar.currentItem.text)
+                    }
+                }
+            }
+        }
+    }
+}

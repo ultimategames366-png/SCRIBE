@@ -1,0 +1,185 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+TextArea {
+    id: root
+
+    required property string initialText
+
+    property bool undoRedoEnabled: false
+    property bool spellCheckEnabled: Runtime.screenplayEditorSettings.enableSpellCheck
+
+    verticalAlignment: Text.AlignTop
+
+    Component.onCompleted: {
+        // For some reason, setting the text property causes it to get reset shortly later.
+        Qt.callLater(() => { if(root.text !== root.initialText) root.text = root.initialText })
+    }
+
+    SyntaxHighlighter.delegates: [
+        LanguageFontSyntaxHighlighterDelegate {
+            enabled: Runtime.screenplayEditorSettings.useLanguageFonts
+            defaultFont: root.font
+        },
+
+        SpellCheckSyntaxHighlighterDelegate {
+            id: _spellChecker
+            enabled: root.spellCheckEnabled
+            cursorPosition: root.cursorPosition
+        }
+    ]
+    SyntaxHighlighter.textDocument: textDocument
+    SyntaxHighlighter.textDocumentUndoRedoEnabled: undoRedoEnabled
+
+    PlaceholderVisibility.visible: !activeFocus && text === ""
+
+    LanguageTransliterator.popup: LanguageTransliteratorPopup {
+        editorFont: root.font
+    }
+    LanguageTransliterator.option: Runtime.language.activeTransliterationOption
+    LanguageTransliterator.enabled: !readOnly
+
+    ContextMenuEvent.onPopup: (mouse) => {
+        if(!root.activeFocus)
+            root.forceActiveFocus()
+
+        if(root.selectedText === "")
+            root.cursorPosition = root.positionAt(mouse.x, mouse.y)
+
+        if(root.activeFocus) {
+            if(root.selectedText === "" && _spellChecker.wordUnderCursorIsMisspelled) {
+                _spellCheckMenu.spellingSuggestions = _spellChecker.spellingSuggestionsForWordUnderCursor
+                _spellCheckMenu.popup()
+            } else
+                _contextMenu.popup()
+        }
+    }
+
+    // palette: Runtime.colors.palette
+    selectByMouse: true
+    selectByKeyboard: true
+
+    persistentSelection: _contextMenu.visible || _spellCheckMenu.active
+
+    // renderType: Text.NativeRendering
+    // selectionColor: Runtime.colors.accent.c700.background
+    // selectedTextColor: Runtime.colors.accent.c700.text
+    background: Rectangle {
+        color: enabled ? Runtime.colors.primary.c10.background : Runtime.colors.primary.button.background
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+
+            width: parent.width
+            height: root.activeFocus ? 2 : 1
+            color: Runtime.colors.accent.c700.background
+            visible: root.enabled
+        }
+    }
+
+    SpecialSymbolsSupport {
+        anchors.top: parent.bottom
+        anchors.left: parent.left
+        textEditor: root
+        textEditorHasCursorInterface: true
+        enabled: !Scrite.document.readOnly
+    }
+
+    SpellingSuggestionsMenu {
+        id: _spellCheckMenu
+
+        property int cursorPosition: -1
+
+        onMenuAboutToShow: () => {
+                               cursorPosition = _spellChecker.cursorPosition
+                           }
+
+        onMenuAboutToHide: () => {
+                               root.forceActiveFocus()
+                               root.cursorPosition = cursorPosition
+                           }
+
+        onReplaceRequest: (suggestion) => {
+                              if(cursorPosition >= 0) {
+                                  _spellChecker.replaceWordAt(cursorPosition, suggestion)
+                                  root.cursorPosition = cursorPosition
+                              }
+                        }
+
+        onAddToDictionaryRequest: () => {
+                                      _spellChecker.addWordAtPositionToDictionary(cursorPosition)
+                                  }
+
+        onAddToIgnoreListRequest: () => {
+                                      _spellChecker.addWordAtPositionToIgnoreList(cursorPosition)
+                                  }
+    }
+
+    ActionHandler {
+        action: ActionHub.editOptions.find("undo")
+        enabled: !root.readOnly && root.activeFocus && root.undoRedoEnabled && root.canUndo
+
+        onTriggered: () => {
+            root.undo()
+            root.textEdited()
+        }
+    }
+
+    ActionHandler {
+        action: ActionHub.editOptions.find("redo")
+        enabled: !root.readOnly && root.activeFocus && root.undoRedoEnabled && root.canRedo
+
+        onTriggered: () => {
+            root.redo()
+            root.textEdited()
+        }
+    }
+
+    VclMenu {
+        id: _contextMenu
+
+        focus: false
+
+        VclMenuItem {
+            text: "Cut\t" + ActionHub.editOptions.find("cut").shortcut
+            enabled: root.selectedText !== ""
+            onClicked: root.cut()
+            focusPolicy: Qt.NoFocus
+        }
+
+        VclMenuItem {
+            text: "Copy\t" + ActionHub.editOptions.find("copy").shortcut
+            enabled: root.selectedText !== ""
+            onClicked: root.copy()
+            focusPolicy: Qt.NoFocus
+        }
+
+        VclMenuItem {
+            text: "Paste\t" + ActionHub.editOptions.find("paste").shortcut
+            onClicked: root.paste()
+            focusPolicy: Qt.NoFocus
+        }
+    }
+}

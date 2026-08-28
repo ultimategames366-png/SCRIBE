@@ -1,0 +1,88 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+
+GridLayout {
+    id: root
+
+    property int cellSize: Runtime.iconImageSize
+    property color selectedColor: Runtime.colors.transparent
+    property alias colors: _colorsView.model
+
+    signal colorPicked(color newColor)
+
+    columns: 7
+    opacity: enabled ? 1 : 0.25
+
+    Item {
+        Layout.preferredWidth: root.cellSize
+        Layout.preferredHeight: root.cellSize
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 5
+
+            source: Runtime.themedIcon("qrc:/icons/navigation/close.png")
+            mipmap: true
+        }
+
+        MouseArea {
+            anchors.fill: parent
+
+            onClicked: root.colorPicked(Runtime.colors.transparent)
+        }
+    }
+
+    Repeater {
+        id: _colorsView
+
+        model: Runtime.colors.forDocument
+
+        Item {
+            id: _colorsViewDelegate
+
+            required property int index
+            required property color modelData
+
+            Layout.preferredWidth: root.cellSize
+            Layout.preferredHeight: root.cellSize
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 3
+
+                color: _colorsViewDelegate.modelData
+
+                border.width: root.selectedColor === _colorsViewDelegate.modelData ? 3 : 0.5
+                border.color: "black"
+            }
+
+            MouseArea {
+                anchors.fill: parent
+
+                onClicked: root.colorPicked(_colorsViewDelegate.modelData)
+            }
+        }
+    }
+}

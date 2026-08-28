@@ -1,0 +1,46 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../globals"
+
+GroupBox {
+    id: root
+
+    property color labelBackground: Runtime.colors.accent.c500.background
+    property color labelText: Runtime.colors.accent.c500.text
+
+    topPadding: label.height + Runtime.idealFontMetrics.height
+
+    label: Rectangle {
+        // x: root.leftPadding
+        width: Math.min(_labelItem.width, root.availableWidth)
+        height: _labelItem.height
+        color: root.labelBackground
+
+        VclLabel {
+            id: _labelItem
+            padding: 5
+            text: root.title
+            font.bold: true
+            color: root.labelText
+        }
+    }
+}

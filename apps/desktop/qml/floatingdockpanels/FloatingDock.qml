@@ -1,0 +1,164 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../helpers"
+import "../controls"
+
+Item {
+    id: root
+
+    // Public properties
+    property real titleBarHeight: _titleBar.height
+    property string title: "Floating Dock"
+    property Component content: Item { }
+
+    // Public signals
+    signal closeRequest()
+
+    // Public methods
+    function open() { visible = true }
+    function close() { visible = false }
+    function toggle() { visible = !visible }
+    function adjustedX(xVal) {
+        const fallback = Scrite.window ? Scrite.window.width : 0
+        const availableSpace = parent ? parent.width : fallback
+        return Runtime.bounded(_private.margin, xVal, availableSpace-width-_private.margin)
+    }
+    function adjustedY(yVal) {
+        const fallback = Scrite.window ? Scrite.window.height : 0
+        const availableSpace = parent ? parent.height : fallback
+        return Runtime.bounded(_private.margin, yVal, availableSpace-height-_private.margin)
+    }
+
+    // Implementation
+
+    parent: FloatingDockLayer.item
+    x: 20
+    y: 20
+    width: 200
+    height: 100
+
+    // Shadow Effect
+    BoxShadow {
+        anchors.fill: parent
+    }
+
+    // Background
+    Rectangle {
+        anchors.fill: parent
+
+        color: Runtime.colors.primary.c100.background
+    }
+
+    // Titlebar
+    Rectangle {
+        id: _titleBar
+
+        width: root.width
+        height: _dialogHeaderLayout.height
+
+        color: Runtime.colors.accent.c600.background
+
+        MouseArea {
+            id: _dragArea
+
+            anchors.fill: parent
+
+            drag.target: root
+            drag.axis: Drag.XAndYAxis
+
+            onPressed: _private.raise()
+        }
+
+        RowLayout {
+            id: _dialogHeaderLayout
+
+            width: parent.width
+
+            spacing: 2
+
+            VclLabel {
+                id: _titleText
+
+                Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
+
+                color: Runtime.colors.accent.c600.text
+                padding: 4
+                font.bold: true
+                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+                text: root.title
+            }
+
+            Image {
+                Layout.alignment: Qt.AlignVCenter
+
+                Layout.preferredWidth: Runtime.idealFontMetrics.height + _titleText.padding*2
+                Layout.preferredHeight: Runtime.idealFontMetrics.height + _titleText.padding*2
+
+                source: Runtime.themedIcon("qrc:/icons/action/dialog_close_button.png")
+                smooth: true
+                mipmap: true
+
+                MouseArea {
+                    anchors.fill: parent
+
+                    hoverEnabled: true
+
+                    onEntered: parent.scale = 1.2
+                    onExited: parent.scale = 1
+                    onClicked: {
+                        root.closeRequest()
+                        Qt.callLater(root.close)
+                    }
+                }
+            }
+        }
+    }
+
+    // Content
+    Loader {
+        width: root.width
+        height: root.height - _titleBar.height
+
+        y: _titleBar.height
+
+        active: root.visible
+        clip: true
+        sourceComponent: root.content
+    }
+
+    // Private section
+    QtObject {
+        id: _private
+
+        readonly property real margin: 20
+
+        function raise() {
+            var docks = root.parent.children
+            for(var i=0; i<docks.length; i++)
+                docks[i].z = 0
+            root.z = 1
+        }
+    }
+}

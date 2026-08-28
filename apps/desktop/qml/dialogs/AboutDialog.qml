@@ -1,0 +1,355 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma Singleton
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+import "../helpers"
+
+DialogLauncher {
+    id: root
+
+    function launch() { return doLaunch() }
+
+    name: "AboutDialog"
+    singleInstanceOnly: true
+
+    dialogComponent: VclDialog {
+        id: _dialog
+
+        title: "About Scrite"
+        width: {
+            const bgImageAspectRatio = 1464.0/978.0
+            return height * bgImageAspectRatio
+        }
+        height: {
+            const bgImageHeight = 978
+            return Math.min(bgImageHeight*0.8, Scrite.window.height * 0.8)
+        }
+
+        content: Item {
+            implicitHeight: _aboutInfoLayout.implicitHeight + 40
+
+            Image {
+                anchors.fill: parent
+                source: "qrc:/images/aboutbox.png"
+                fillMode: Image.PreserveAspectCrop
+                smooth: true; mipmap: true
+            }
+
+            VclLabel {
+                id: _versionText
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 30
+
+                text: Scrite.app.versionAsString + (Scrite.app.versionType !== "" ? "-" + Scrite.app.versionType : "") + " for " + [Platform.typeString, Platform.osVersionString].join("-")
+                width: Math.min(Runtime.idealFontMetrics.advanceWidth(text), _dialog.width*0.5)
+                elide: Text.ElideLeft
+                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+            }
+
+            VclText {
+                font.pixelSize: 12
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Build Timestamp:\n" + Scrite.app.buildTimestamp
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                anchors.margins: 30
+            }
+
+            ColumnLayout {
+                id: _aboutInfoLayout
+                spacing: 10
+                anchors.centerIn: parent
+
+                Image {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: _dialog.width * 0.3
+                    Layout.preferredHeight: sourceSize.height * Layout.preferredWidth/sourceSize.width
+
+                    source: Runtime.colors.scheme === Qt.ColorScheme.Dark ? "qrc:/images/scrite_logo_for_report_header_darkmode.png" : "qrc:/images/scrite_logo_for_report_header.png" 
+                    fillMode: Image.PreserveAspectFit
+                    mipmap: true; smooth: true
+                }
+
+                Item {
+                    Layout.preferredWidth: parent.width
+                    Layout.preferredHeight: 14
+                }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+
+                    spacing: 10
+
+                    Link {
+                        text: "Terms Of Use"
+                        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                        onClicked: Qt.openUrlExternally("https://www.scrite.io/terms-of-use/")
+                    }
+
+                    VclText {
+                        text: "•"
+                        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                    }
+
+                    Link {
+                        text: "Privacy Policy"
+                        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                        onClicked: Qt.openUrlExternally("https://www.scrite.io/privacy-policy/")
+                    }
+
+                    VclText {
+                        text: "•"
+                        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                    }
+
+                    Link {
+                        text: "License"
+                        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                        onClicked: ViewLicenseDialog.launch()
+                    }
+
+                    VclText {
+                        text: "•"
+                        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                    }
+
+                    Link {
+                        text: "Refund Policy"
+                        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                        onClicked: Qt.openUrlExternally("https://www.scrite.io/refund-and-cancellation-policy/")
+                    }
+                }
+
+                Item {
+                    Layout.preferredWidth: parent.width
+                    Layout.preferredHeight: 14
+                }
+
+                VclLabel {
+                    Layout.alignment: Qt.AlignHCenter
+
+                    text: "The app uses:"
+                    font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                }
+
+                Item {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: _dialog.width * 0.5
+                    Layout.preferredHeight: (Runtime.minimumFontMetrics.height+_creditsView.spacing) * (_creditsView.model.count+1) + _creditsView.anchors.topMargin + _creditsView.anchors.bottomMargin
+
+                    // Refactoring QML TODO: Add ScrollBar back to this.
+                    ListView {
+                        id: _creditsView
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        spacing: 7
+                        clip: true
+                        model: ListModel {
+                            ListElement {
+                                credits: "<strong>Phonetic Translator</strong> library for static transliteration of Indian languages."
+                                url: "https://sourceforge.net/projects/phtranslator/"
+                            }
+
+                            ListElement {
+                                credits: "<strong>Alar</strong> and <strong>Olam</strong> Dictpress dictionaries for phonetic transliteration of Kannada and Malayalam."
+                                url: "https://dict.press/"
+                            }
+
+                            ListElement {
+                                credits: "<strong>Sanscript</strong> for transliteration across Indian scripts and romanization schemes."
+                                url: "https://github.com/indic-transliteration/sanscript.js"
+                            }
+
+                            ListElement {
+                                credits: "<strong>Sonnet</strong> from KDE Frameworks for powering spell check."
+                                url: "https://api.kde.org/sonnet-index.html"
+                            }
+
+                            ListElement {
+                                credits: "<strong>QuaZip</strong> for (un)compressing Scrite documents."
+                                url: "https://github.com/stachenov/quazip"
+                            }
+
+                            ListElement {
+                                credits: "<strong>SimpleCrypt</strong> for encrypting Scrite documents."
+                                url: "https://wiki.qt.io/Simple_encryption_with_SimpleCrypt"
+                            }
+
+                            ListElement {
+                                credits: "<strong>OpenXLSX</strong> for exporting reports to Excel format."
+                                url: "https://github.com/troldal/OpenXLSX"
+                            }
+
+                            ListElement {
+                                credits: "<strong>Curved-Arrows</strong> library for evaluating curved arrow connectors."
+                                url: "https://github.com/dragonman225/curved-arrows"
+                            }
+
+                            ListElement {
+                                credits: "<strong>QuillJS</strong> for powering rich text editor in Notebook."
+                                url: "https://quilljs.com/"
+                            }
+
+                            Component.onCompleted: {
+                                append({
+                                           "credits": "<strong>Qt</strong> " + Platform.qtVersionString + " as UI framework for the entire app.",
+                                           "url": "https://www.qt.io"
+                                       })
+
+                                if(Platform.isWindowsDesktop || Platform.isLinuxDesktop) {
+                                    const v = Platform.openSslVersionString
+                                    append({
+                                                "credits": "<strong>" + v + "</strong> for use with https protocol.",
+                                                "url": "https://openssl-library.org/news/openssl-1.1.1-notes/index.html"
+                                           })
+                                }
+                            }
+                        }
+                        ScrollBar.vertical: ScrollBar { }
+                        delegate: VclLabel {
+                            id: _creditsViewDelegate
+
+                            required property int index
+                            required property string credits
+                            required property url url
+
+                            text: credits
+                            color: _creditLabelMouseArea.containsMouse ? Runtime.colors.hoveredLinkColor : Runtime.colors.primary.editor.text
+                            width: _creditsView.width // - (_creditsView.ScrollBar.vertical.needed ? 20 : 0)
+                            wrapMode: Text.WordWrap
+                            font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                            horizontalAlignment: Text.AlignHCenter
+
+                            MouseArea {
+                                id: _creditLabelMouseArea
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Qt.openUrlExternally(_creditsViewDelegate.url)
+                                hoverEnabled: true
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    Layout.preferredWidth: parent.width
+                    Layout.preferredHeight: 14
+                }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+
+                    Image {
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.preferredWidth: 24
+                        Layout.preferredHeight: 24
+
+                        source: Runtime.themedIcon("qrc:/icons/action/share.png")
+                    }
+
+                    VclLabel {
+                        Layout.alignment: Qt.AlignVCenter
+
+                        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                        leftPadding: 10; rightPadding: 3
+                        text: "Share Scrite: "
+                    }
+
+                    RowLayout {
+                        spacing: -8
+
+                        VclToolButton {
+                            Layout.preferredWidth: 50
+                            Layout.preferredHeight: 50
+
+                            flat: true
+                            toolTipText: "Post about Scrite on your Facebook page."
+                            icon.source: Runtime.themedIcon("qrc:/icons/action/share_on_facebook.png")
+
+                            onClicked: Qt.openUrlExternally("https://www.scrite.io?share_on_facebook")
+                        }
+
+                        VclToolButton {
+                            Layout.preferredWidth: 50
+                            Layout.preferredHeight: 50
+
+                            flat: true
+                            toolTipText: "Post about Scrite on your LinkedIn page."
+                            icon.source: Runtime.themedIcon("qrc:/icons/action/share_on_linkedin.png")
+
+                            onClicked: Qt.openUrlExternally("https://www.scrite.io?share_on_linkedin")
+                        }
+
+                        VclToolButton {
+                            Layout.preferredWidth: 50
+                            Layout.preferredHeight: 50
+
+                            flat: true
+                            toolTipText: "Tweet about Scrite from your handle."
+                            icon.source: Runtime.themedIcon("qrc:/icons/action/share_on_twitter.png")
+
+                            onClicked: Qt.openUrlExternally("https://www.scrite.io?share_on_twitter")
+                        }
+
+                        VclToolButton {
+                            readonly property string url: "mailto:?Subject=Take a look at Scrite&Body=I am using Scrite and I thought you should check it out as well. Visit https://www.scrite.io"
+
+                            Layout.preferredWidth: 50
+                            Layout.preferredHeight: 50
+
+                            flat: true
+                            toolTipText: "Send an email about Scrite."
+                            icon.source: Runtime.themedIcon("qrc:/icons/action/share_on_email.png")
+
+                            onClicked: Qt.openUrlExternally(url)
+                        }
+                    }
+                }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+
+                    spacing: 20
+
+                    VclButton {
+                        text: "Website"
+                        onClicked: Qt.openUrlExternally("https://www.scrite.io")
+                    }
+
+                    VclButton {
+                        text: "Learning Guides"
+                        onClicked: Qt.openUrlExternally(Runtime.userGuidesUrl)
+                    }
+
+                    VclButton {
+                        text: "Discord"
+                        onClicked: JoinDiscordCommunity.launch()
+                    }
+                }
+            }
+        }
+    }
+}

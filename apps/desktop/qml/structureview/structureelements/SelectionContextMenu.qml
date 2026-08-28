@@ -1,0 +1,201 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+
+import io.scrite.components
+
+import "../"
+import "../../globals"
+import "../../dialogs"
+import "../../helpers"
+import "../../controls"
+
+VclMenu {
+    id: root
+
+    required property AbstractSelection selection
+
+    signal deleteSelectionRequest()
+    signal ensureItemVisibleRequest(Item item)
+    signal rectangleAnnotationRequest(real x, real y, real w, real h)
+
+    width: 250
+
+    ColorMenu {
+        title: "Scenes Color"
+
+        onMenuItemClicked: (color) => {
+            let items = root.selection.items
+            items.forEach( function(item) { item.element.scene.color = color })
+            root.close()
+        }
+    }
+
+    MarkSceneAsMenu {
+        title: "Mark Scenes As"
+        enableValidation: false
+
+        onTriggered: (type) => {
+            let items = root.selection.items
+            items.forEach( function(item) { item.element.scene.type = type })
+            root.close()
+        }
+    }
+
+    VclMenu {
+        title: "Layout"
+
+        VclMenuItem {
+            text: "Layout Horizontally"
+            enabled: !Scrite.document.readOnly && (root.selection.hasItems ? root.selection.canLayout : Scrite.document.structure.elementCount >= 2) && !Scrite.document.structure.forceBeatBoardLayout
+            icon.source: Runtime.themedIcon("qrc:/icons/action/layout_horizontally.png")
+
+            onClicked: {
+                const s = root.selection as StructureElementsSelection
+                s.layout(Structure.HorizontalLayout)
+            }
+        }
+
+        VclMenuItem {
+            icon.source: Runtime.themedIcon("qrc:/icons/action/layout_vertically.png")
+            text: "Layout Vertically"
+            enabled: !Scrite.document.readOnly && (root.selection.hasItems ? root.selection.canLayout : Scrite.document.structure.elementCount >= 2) && !Scrite.document.structure.forceBeatBoardLayout
+
+            onClicked: {
+                const s = root.selection as StructureElementsSelection
+                s.layout(Structure.VerticalLayout)
+            }
+        }
+
+        VclMenuItem {
+            icon.source: Runtime.themedIcon("qrc:/icons/action/layout_flow_horizontally.png")
+            text: "Flow Horizontally"
+            enabled: !Scrite.document.readOnly && (root.selection.hasItems ? root.selection.canLayout : Scrite.document.structure.elementCount >= 2) && !Scrite.document.structure.forceBeatBoardLayout
+
+            onClicked: {
+                const s = root.selection as StructureElementsSelection
+                s.layout(Structure.FlowHorizontalLayout)
+            }
+        }
+
+        VclMenuItem {
+            text: "Flow Vertically"
+            enabled: !Scrite.document.readOnly && (root.selection.hasItems ? root.selection.canLayout : Scrite.document.structure.elementCount >= 2) && !Scrite.document.structure.forceBeatBoardLayout
+            icon.source: Runtime.themedIcon("qrc:/icons/action/layout_flow_vertically.png")
+
+            onClicked: {
+                const s = root.selection as StructureElementsSelection
+                s.layout(Structure.FlowVerticalLayout)
+            }
+        }
+    }
+
+    VclMenuItem {
+        text: "Annotate With Rectangle"
+
+        onClicked: {
+            root.rectangleAnnotationRequest(root.selection.rect.x-10, root.selection.rect.y-10, root.selection.rect.width+20, root.selection.rect.height+20)
+            root.selection.clear()
+        }
+    }
+
+    VclMenuItem {
+        text: "Stack"
+
+        enabled: !Scrite.document.readOnly && _sceneGroup.canBeStacked
+
+        onTriggered: _sceneGroup.stack()
+    }
+
+    VclMenuItem {
+        text: "Add To Timeline"
+
+        onClicked: {
+            let items = root.selection.items
+            items.forEach( function(item) {
+                Scrite.document.screenplay.addScene(item.element.scene)
+            })
+        }
+    }
+
+    VclMenuItem {
+        text: "Remove From Timeline"
+
+        enabled: {
+            if(!root.selection.hasItems)
+                return false
+            let items = root.selection.items
+            for(var i=0; i<items.length; i++) {
+                if(items[i].element.scene.addedToScreenplay)
+                    continue
+                return false
+            }
+            return true
+        }
+
+        onClicked: {
+            let items = root.selection.items
+            let firstItem = items[0]
+            items.forEach( function(item) {
+                Scrite.document.screenplay.removeSceneElements(item.element.scene)
+            })
+            root.selection.clear()
+            root.ensureItemVisibleRequest(firstItem)
+        }
+    }
+
+    StructureGroupsMenu {
+        id: _structureGroupsMenu
+
+        sceneGroup: _sceneGroup
+
+        onToggled: Runtime.execLater(root.selection, 250, function() { root.selection.refit() })
+    }
+
+    VclMenuItem {
+        text: "Keywords"
+        enabled: !Scrite.document.readOnly
+
+        onClicked: SceneGroupKeywordsDialog.launch(_sceneGroup)
+    }
+
+    VclMenuItem {
+        text: "Delete"
+        enabled: !Scrite.document.readOnly
+
+        onClicked: root.deleteSelectionRequest()
+    }
+
+    SceneGroup {
+        id: _sceneGroup
+
+        structure: Scrite.document.structure
+    }
+
+    onClosed: _sceneGroup.clear()
+
+    onAboutToShow: {
+        _sceneGroup.clearScenes()
+
+        let items = root.selection.items
+        items.forEach( function(item) {
+            _sceneGroup.addScene(item.element.scene)
+        })
+    }
+}

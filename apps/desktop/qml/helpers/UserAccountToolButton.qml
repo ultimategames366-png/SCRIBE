@@ -1,0 +1,208 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Window
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../dialogs"
+
+Item {
+    id: root
+
+    width: 50+15
+    height: 50
+
+    Item {
+        anchors.top: parent.top
+        anchors.topMargin: height * 0.05
+        anchors.left: parent.left
+
+        width: Math.min(parent.width,parent.height)
+        height: width
+
+        Rectangle {
+            anchors.centerIn: parent
+
+            color: Runtime.colors.accent.c600.background
+            width: Math.min(parent.width,parent.height)
+            height: width
+            radius: width/2
+        }
+
+        Image {
+            id: _profilePic
+
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            width: parent.width
+            source: Scrite.user.loggedIn ? Scrite.user.info.badgeImageUrl : ""
+            smooth: true; mipmap: true
+
+            visible: source != ""
+            fillMode: Image.PreserveAspectFit
+        }
+
+        Loader {
+            active: Scrite.user.unreadMessageCount > 0
+
+            anchors.top: parent.top
+            anchors.right: parent.right
+
+            sourceComponent: Rectangle {
+                width: Math.max(_unreadMessageCountLabel.contentWidth*1.15, _unreadMessageCountLabel.contentHeight*1.15)
+                height: width; radius: width/2
+
+                color: Runtime.colors.primary.a100.background
+
+                Text {
+                    id: _unreadMessageCountLabel
+
+                    font.bold: true
+                    font.pixelSize: root.height * 0.25
+
+                    anchors.centerIn: parent
+
+                    text: {
+                        const count = Scrite.user.unreadMessageCount
+                        if(count >= 10)
+                            return "9+"
+                        return count
+                    }
+                    color: Runtime.colors.primary.a100.text
+                }
+            }
+        }
+
+        Item {
+            width: 1; height: 1
+            anchors.centerIn: parent
+
+            Text {
+                anchors.top: _initials.top
+                anchors.left: _initials.left
+                anchors.margins: 1
+
+                font: _initials.font
+                text: _initials.text
+                color: Runtime.colors.primary.c600.background
+                opacity: 0.5
+            }
+
+            Text {
+                id: _initials
+                anchors.centerIn: parent
+
+                font.bold: true
+                font.pixelSize: root.height * 0.3
+
+                color: Scrite.user.info.badgeTextColor
+                text: {
+                    if(Scrite.user.loggedIn)
+                        return Scrite.user.info.initials()
+                    return "S"
+                }
+            }
+        }
+
+        Loader {
+            width: 1; height: 1
+
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: parent.height * 0.14
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            active: Scrite.user.loggedIn && Scrite.user.info.hasActiveSubscription && Scrite.user.info.subscriptions[0].kind === "trial"
+
+            sourceComponent: Item {
+                Text {
+                    anchors.centerIn: parent
+
+                    font.pixelSize: root.height * 0.15
+
+                    text: "" + Scrite.user.info.subscriptions[0].daysToUntil
+                    color: Runtime.colors.primary.c600.text
+                }
+            }
+        }
+
+        BusyIcon {
+            visible: Scrite.user.busy
+            running: Scrite.user.busy
+            anchors.centerIn: parent
+            forDarkBackground: true
+        }
+
+        MouseArea {
+            anchors.fill: parent
+
+            cursorShape: Qt.PointingHandCursor
+            hoverEnabled: true
+
+            onClicked: {
+                let screenName = undefined
+
+                if(Scrite.user.unreadMessageCount > 0)
+                    screenName = "Notifications"
+                else if(Scrite.user.info.hasActiveSubscription && !Scrite.user.info.hasUpcomingSubscription && Scrite.user.info.subscriptions[0].daysToUntil < 15)
+                    screenName = "Subscriptions"
+
+                UserAccountDialog.launch(screenName)
+            }
+
+            ToolTipPopup {
+                text: Scrite.user.loggedIn ? ("Account Profile (" + Gui.nativeShortcut(_userAccountHandler.action.shortcut) + ")") : "Login"
+                visible: parent.containsMouse
+            }
+        }
+
+        ActionHandler {
+            id: _userAccountHandler
+
+            action: ActionHub.userOptions.find("userAccount")
+            enabled: Runtime.allowAppUsage
+
+            onTriggered: UserAccountDialog.launch()
+        }
+
+        ActionHandler {
+            action: ActionHub.userOptions.find("messages")
+            enabled: Runtime.allowAppUsage
+
+            onTriggered: UserAccountDialog.launch("Notifications")
+        }
+
+        ActionHandler {
+            action: ActionHub.userOptions.find("subscriptions")
+            enabled: Runtime.allowAppUsage
+
+            onTriggered: UserAccountDialog.launch("Subscriptions")
+        }
+
+        ActionHandler {
+            action: ActionHub.userOptions.find("installations")
+            enabled: Runtime.allowAppUsage
+
+            onTriggered: UserAccountDialog.launch("Installations")
+        }
+    }
+}

@@ -1,0 +1,299 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Window
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+import "../helpers"
+import "../dialogs"
+import "../overlays"
+
+Rectangle {
+    id: root
+
+    required property int canvasEpisodeBoxCount
+
+    required property bool canvasPreviewVisible
+    required property bool canvasScrollInteractive
+
+    required property real canvasScale
+    required property real canvasScrollMinimumScale
+    required property real canvasScrollMaximumScale
+
+    required property BoundingBoxEvaluator canvasItemsBoundingBox
+
+    signal zoomInRequest()
+    signal zoomOutRequest()
+    signal zoomToRequest(real zoomValue)
+    signal zoomFitRequest(rect boundingBox)
+    signal zoomOneRequest()
+
+    height: 30
+
+    clip: true
+    color: Runtime.colors.primary.windowColor
+    border.width: 1
+    border.color: Runtime.colors.primary.borderColor
+
+    VclText {
+        id: _statusText
+
+        anchors.left: parent.left
+        anchors.right: _statusBarControls.left
+        anchors.margins: 10
+        anchors.verticalCenter: parent.verticalCenter
+
+        elide: Text.ElideRight
+        font.pixelSize: root.height * 0.5
+
+        text: {
+            if(!root.canvasScrollInteractive)
+                return "Canvas Locked While Index Card Has Focus. Hit ESC To Release Focus."
+
+            let ret = Scrite.document.structure.elementCount + " Scenes";
+            if(root.canvasEpisodeBoxCount > 0)
+                ret += ", " + root.canvasEpisodeBoxCount + " Episodes";
+            if(Scrite.document.structure.forceBeatBoardLayout)
+                ret += ", Scenes Not Movable"
+            ret += "."
+            return ret;
+        }
+
+        MouseArea {
+            id: _statusTextMouseArea
+
+            anchors.fill: parent
+
+            enabled: parent.truncated
+            hoverEnabled: true
+
+            ToolTipPopup {
+                text: _statusText.text
+                visible: _statusTextMouseArea.containsMouse
+            }
+        }
+    }
+
+    Row {
+        id: _statusBarControls
+
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+
+        height: parent.height-6
+        spacing: 10
+
+        FlatToolButton {
+            suggestedWidth: parent.height
+            suggestedHeight: parent.height
+
+            down: _structureViewOptionsMenu.active
+            checkable: false
+            autoRepeat: false
+            iconSource: Runtime.themedIcon("qrc:/icons/content/view_options.png")
+            toolTipText: "Toggle between index-card view options."
+
+            onClicked: _structureViewOptionsMenu.show()
+
+            MenuLoader {
+                id: _structureViewOptionsMenu
+
+                anchors.left: parent.left
+                anchors.bottom: parent.top
+                anchors.bottomMargin: item ? item.height : 0
+
+                menu: VclMenu {
+                    VclMenuItem {
+                        property bool _checked: Scrite.document.structure.canvasUIMode === Structure.IndexCardUI &&
+                                                Scrite.document.structure.indexCardContent === Structure.Synopsis
+
+                        text: "Index Cards"
+                        icon.source: _checked ? Runtime.themedIcon("qrc:/icons/navigation/check.png") : Runtime.themedIcon("qrc:/icons/content/blank.png")
+
+                        onClicked: {
+                            if(!_checked) {
+                                if(Scrite.document.structure.canvasUIMode === Structure.IndexCardUI)
+                                    Scrite.document.structure.indexCardContent = Structure.Synopsis
+                                else
+                                    Runtime.resetMainWindowUi( () => {
+                                        Scrite.document.structure.canvasUIMode = Structure.IndexCardUI
+                                        Scrite.document.structure.indexCardContent = Structure.Synopsis
+                                    } )
+                            }
+                        }
+                    }
+
+                    VclMenuItem {
+                        property bool _checked: Scrite.document.structure.canvasUIMode === Structure.IndexCardUI &&
+                                                Scrite.document.structure.indexCardContent === Structure.FeaturedPhoto
+
+                        text: "Photo Cards"
+                        icon.source: _checked ? Runtime.themedIcon("qrc:/icons/navigation/check.png") : Runtime.themedIcon("qrc:/icons/content/blank.png")
+
+                        onClicked: {
+                            if(!_checked)
+                                if(Scrite.document.structure.canvasUIMode === Structure.IndexCardUI)
+                                    Scrite.document.structure.indexCardContent = Structure.FeaturedPhoto
+                                else
+                                    Runtime.resetMainWindowUi( () => {
+                                        Scrite.document.structure.canvasUIMode = Structure.IndexCardUI
+                                        Scrite.document.structure.indexCardContent = Structure.FeaturedPhoto
+                                    } )
+                        }
+                    }
+
+                    VclMenuItem {
+                        property bool _checked: Scrite.document.structure.canvasUIMode === Structure.SynopsisEditorUI
+
+                        text: "Synopsis Cards"
+                        icon.source: _checked ? Runtime.themedIcon("qrc:/icons/navigation/check.png") : Runtime.themedIcon("qrc:/icons/content/blank.png")
+
+                        onClicked: {
+                            if(!_checked) {
+                                if(Scrite.document.structure.elementCount > 0)
+                                    MessageBox.information("Cannot Switch to Synopsis Cards",
+                                                           "Switching to Synopsis Cards is only possible when the structure canvas is empty.")
+                                else
+                                    Runtime.resetMainWindowUi( () => {
+                                        Scrite.document.structure.canvasUIMode = Structure.SynopsisEditorUI
+                                    } )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        FlatToolButton {
+            suggestedWidth: parent.height
+            suggestedHeight: parent.height
+
+            checked: Runtime.workspaceSettings.mouseWheelZoomsInStructureCanvas
+            checkable: true
+            autoRepeat: false
+            iconSource: Runtime.themedIcon("qrc:/icons/hardware/mouse.png")
+            toolTipText: "Mouse wheel currently " + (checked ? "zooms" : "scrolls") + ". Click this button to make it " + (checked ? "scroll" : "zoom") + "."
+
+            onCheckedChanged: Runtime.workspaceSettings.mouseWheelZoomsInStructureCanvas = checked
+        }
+
+        FlatToolButton {
+            suggestedWidth: parent.height
+            suggestedHeight: parent.height
+
+            down: root.canvasPreviewVisible
+            checked: root.canvasPreviewVisible
+            checkable: true
+            iconSource: Runtime.themedIcon("qrc:/icons/action/thumbnail.png")
+            toolTipText: "Preview"
+
+            onToggled: Runtime.structureCanvasSettings.showPreview = checked
+        }
+
+        Rectangle {
+            height: parent.height
+            width: 1
+            color: Runtime.colors.primary.borderColor
+        }
+
+        FlatToolButton {
+            id: _cmdZoomOne
+
+            suggestedWidth: parent.height
+            suggestedHeight: parent.height
+
+            enabled: root.canvasItemsBoundingBox.itemCount > 0
+            autoRepeat: true
+            iconSource: Runtime.themedIcon("qrc:/icons/navigation/zoom_one.png")
+            toolTipText: Runtime.tooltipText("Zoom One", _zoomOneHandler.action.shortcut)
+
+            onClicked: root.zoomOneRequest()
+
+            ActionHandler {
+                id: _zoomOneHandler
+
+                action: ActionHub.structureCanvasOperations.find("zoomOne")
+
+                onTriggered: _cmdZoomOne.clicked()
+            }
+        }
+
+        FlatToolButton {
+            id: _cmdZoomFit
+
+            suggestedWidth: parent.height
+            suggestedHeight: parent.height
+
+            enabled: root.canvasItemsBoundingBox.itemCount > 0
+            autoRepeat: true
+            iconSource: Runtime.themedIcon("qrc:/icons/navigation/zoom_fit.png")
+            toolTipText: Runtime.tooltipText("Zoom Fit", _zoomFitHandler.action.shortcut)
+
+            onClicked: root.zoomFitRequest(root.canvasItemsBoundingBox.boundingBox)
+
+            ActionHandler {
+                id: _zoomFitHandler
+
+                action: ActionHub.structureCanvasOperations.find("zoomFit")
+
+                onTriggered: _cmdZoomFit.clicked()
+            }
+        }
+
+        ZoomSlider {
+            id: _zoomSlider
+
+            anchors.verticalCenter: parent.verticalCenter
+
+            height: parent.height
+
+            to: root.canvasScrollMaximumScale
+            from: root.canvasScrollMinimumScale
+            value: root.canvasScale
+            stepSize: 0.0
+            zoomInTooltip: Runtime.tooltipText("Zoom In", _zoomInHandler.action.shortcut)
+            zoomOutTooltip: Runtime.tooltipText("Zoom Out", _zoomOutHandler.action.shortcut)
+
+            onSliderMoved: root.zoomToRequest(zoomLevel)
+            onZoomInRequest: root.zoomInRequest()
+            onZoomOutRequest: root.zoomOutRequest()
+
+            ActionHandler {
+                id: _zoomInHandler
+
+                enabled: _zoomSlider.value < _zoomSlider.to
+                action: ActionHub.structureCanvasOperations.find("zoomIn")
+
+                onTriggered: _zoomSlider.zoomIn()
+            }
+
+            ActionHandler {
+                id: _zoomOutHandler
+
+                enabled: _zoomSlider.value > _zoomSlider.from
+                action: ActionHub.structureCanvasOperations.find("zoomOut")
+
+                onTriggered: _zoomSlider.zoomOut()
+            }
+        }
+    }
+}

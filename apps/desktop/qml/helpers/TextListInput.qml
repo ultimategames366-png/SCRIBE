@@ -1,0 +1,237 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+import "../globals/runtime"
+
+Flow {
+    id: root
+
+    required property var textList
+    required property var completionStrings
+    required property string labelText
+    required property string labelIconSource
+    required property string addTextButtonTooltip
+
+    property int maxTextLength: 30
+    property bool readOnly: false
+    property font font: Runtime.idealFontMetrics.font
+    property real textBorderWidth: 1
+    property real zoomLevel: 1.0
+
+    property ColorPair_RT textColors: ColorPair_RT {
+        text: Runtime.colors.scheme === Qt.ColorScheme.Dark ? "white" : "black"
+        background: Runtime.colors.scheme === Qt.ColorScheme.Dark ? Qt.rgba(0, 0, 0, 0.25) : Qt.rgba(1, 1, 1, 0.25)
+    }
+    property ColorPair_RT highlightedTextColors: ColorPair_RT {
+        text: Runtime.colors.scheme === Qt.ColorScheme.Dark ? "white" : "black"
+        background: Runtime.colors.scheme === Qt.ColorScheme.Dark ? Qt.rgba(0, 0, 0, 0.5) : Qt.rgba(1, 1, 1, 0.5)
+    }
+
+    property alias header: _headerLoader.sourceComponent
+    property alias labelIconVisible: _labelIcon.visible
+
+    readonly property alias label: _label
+    readonly property alias acceptingNewText: _newInputLoader.active
+    readonly property real headerImplicitHeight: _headerLoader.item ? _headerLoader.item.implicitHeight : 0
+
+    signal ensureVisible(Item item, rect area)
+    signal textClicked(string text, Item source)
+    signal textCloseRequest(string text, Item source)
+    signal configureTextRequest(string text, TagText tag)
+    signal newTextRequest(string text)
+    signal newTextCancelled()
+
+    function configureTextsLater() {
+        Qt.callLater(configureTexts)
+    }
+
+    function configureTexts() {
+        const nrTexts = _tagTexts.count
+        for(let i=0; i<nrTexts; i++) {
+            let text = _tagTexts.itemAt(i)
+            text.configure()
+        }
+    }
+
+    function acceptNewText() {
+        _newInputLoader.active = true
+    }
+
+    flow: Flow.LeftToRight
+    spacing: 5
+
+    Loader {
+        id: _headerLoader
+        active: sourceComponent !== null
+    }
+
+    FlatToolButton {
+        id: _labelIcon
+
+        suggestedWidth: _label.height
+        suggestedHeight: _label.height
+        toolTipText: root.labelText
+
+        iconSource: root.labelIconSource
+
+        onClicked: _newInputLoader.active = true
+    }
+
+    VclLabel {
+        id: _label
+
+        text: root.labelText + ": "
+
+        topPadding: 5
+        bottomPadding: 5
+
+        font.bold: true
+        font.family: root.font.family
+        font.pointSize: root.font.pointSize // Math.max(root.font.pointSize * root.zoomLevel, Runtime.minimumFontMetrics.font.pointSize)
+    }
+
+    Repeater {
+        id: _tagTexts
+
+        model: root.textList
+
+        delegate: TagText {
+            id: _tagText
+
+            required property int index
+            required property string modelData
+
+            property var colors: containsMouse ? root.highlightedTextColors : root.textColors
+
+            Component.onCompleted: configure()
+
+            border.width: root.textBorderWidth
+
+            text: modelData
+            color: colors.background
+            enabled: !root.readOnly
+            textColor: colors.text
+            topPadding: Math.max(5, 5 * root.zoomLevel)
+            leftPadding: Math.max(10, 10 * root.zoomLevel)
+            rightPadding: leftPadding
+            bottomPadding: topPadding
+
+            font.family: root.font.family
+            font.pointSize: root.font.pointSize //Math.max(root.font.pointSize * root.zoomLevel, Runtime.minimumFontMetrics.font.pointSize)
+            font.capitalization: root.font.capitalization
+
+            onClicked: root.textClicked(modelData, _tagText)
+
+            onCloseRequest: {
+                if(!root.readOnly) {
+                    _newInputLoader.active = false
+                    root.textCloseRequest(modelData, _tagText)
+                }
+            }
+
+            function configure() {
+                root.configureTextRequest(modelData, _tagText)
+            }
+        }
+    }
+
+    Item {
+        height: Math.max(_tagTexts.count > 0 ? (_tagTexts.itemAt(_tagTexts.count-1)?.height ?? root.headerImplicitHeight) : root.headerImplicitHeight, _label.height)
+        width: (_newInputLoader.active ? _newInputLoader.width : 0) + _addBoxImage.width
+
+        Loader {
+            id: _newInputLoader
+
+            anchors.verticalCenter: parent.verticalCenter
+
+            active: false
+            visible: active
+
+            sourceComponent: VclTextField {
+                Component.onCompleted: {
+                    forceActiveFocus()
+                    root.ensureVisible(_newInputLoader, Qt.rect(0,0,width,height))
+                }
+
+                Keys.onEscapePressed: {
+                    text = ""
+                    root.newTextCancelled()
+                    _newInputLoader.active = false
+                }
+
+                width: Math.max(contentWidth + leftPadding + rightPadding, Runtime.idealFontMetrics.averageCharacterWidth * 20)
+
+                readOnly: false
+                maximumLength: root.maxTextLength
+                completionStrings: root.completionStrings
+
+                font.family: root.font.family
+                font.pointSize: root.font.pointSize // Math.max(root.font.pointSize * root.zoomLevel, Runtime.minimumFontMetrics.font.pointSize)
+                font.capitalization: root.font.capitalization
+
+                onEditingComplete: {
+                    if(text.length > 0) {
+                        root.newTextRequest(text)
+                    }
+                    _newInputLoader.active = false
+                }
+            }
+
+            onStatusChanged: {
+                if(status === Loader.Null) {
+                    Object.resetProperty(_newInputLoader, "width")
+                    Object.resetProperty(_newInputLoader, "height")
+                }
+            }
+        }
+
+        Image {
+            id: _addBoxImage
+
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+
+            source: Runtime.themedIcon("qrc:/icons/content/add_box.png")
+
+            width: _label.height
+            height: width
+
+            opacity: enabled ? 1 : 0.5
+            visible: enabled
+            enabled: !root.readOnly
+
+            MouseArea {
+                anchors.fill: parent
+
+                ToolTipPopup {
+                    text: root.addTextButtonTooltip + " (Max " + root.maxTextLength + " letters)"
+                    visible: container.containsMouse
+                }
+
+                onClicked: _newInputLoader.active = true
+            }
+        }
+    }
+}

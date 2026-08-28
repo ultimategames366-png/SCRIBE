@@ -1,0 +1,71 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../../globals"
+import "../../helpers"
+import "../../controls"
+import ".."
+
+StructureElementConnector {
+    id: root
+
+    required property Item canvasScrollViewport
+    required property rect canvasScrollViewportRect
+
+    required property real canvasScale
+
+    required property string labelText
+
+    required property BoundingBoxEvaluator canvasItemsBoundingBox
+
+    property alias labelVisible: _labelBg.visible
+
+    visible: canBeVisible ? GMath.doRectanglesIntersect(root.canvasScrollViewportRect, contentRect) : false
+    lineType: StructureElementConnector.CurvedLine
+    outlineWidth: Scrite.app.devicePixelRatio * Runtime.bounded(1, Math.round(root.canvasScale * Runtime.structureCanvasSettings.connectorLineWidth), 5)
+    arrowAndLabelSpacing: _labelBg.width
+
+    Rectangle {
+        id: _labelBg
+
+        x: root.suggestedLabelPosition.x - radius
+        y: root.suggestedLabelPosition.y - radius
+
+        width: Math.max(_labelItem.width,_labelItem.height)+20
+        height: width
+        radius: width/2
+
+        color: Runtime.colors.tintTx(root.outlineColor, Runtime.colors.sceneControlTint)
+        border.width: 1
+        border.color: Runtime.colors.primary.borderColor
+
+        VclText {
+            id: _labelItem
+
+            anchors.centerIn: parent
+
+            text: root.labelText
+            color: Color.textColorFor(parent.color)
+            font.pixelSize: 12
+        }
+    }
+}

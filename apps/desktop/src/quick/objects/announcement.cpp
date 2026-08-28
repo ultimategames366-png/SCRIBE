@@ -1,0 +1,66 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+#include "callgraph.h"
+#include "announcement.h"
+
+#include <QCoreApplication>
+
+Announcement::Announcement(QObject *parent) : QObject(parent)
+{
+    connect(AnnouncementBroadcast::instance(), &AnnouncementBroadcast::shout, this,
+            &Announcement::hearing);
+}
+
+Announcement::~Announcement() { }
+
+Announcement *Announcement::qmlAttachedProperties(QObject *object)
+{
+    return new Announcement(object);
+}
+
+void Announcement::shout(const QString &type, const QJSValue &data)
+{
+    AnnouncementBroadcast::instance()->doShout(this, type, data);
+}
+
+void Announcement::hearing(Announcement *from, const QString &type, const QJSValue &data)
+{
+    if (from == this)
+        return;
+
+    emit incoming(type, data);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+AnnouncementBroadcast *AnnouncementBroadcast::instance()
+{
+    // CAPTURE_FIRST_CALL_GRAPH;
+    static AnnouncementBroadcast *theInstance = new AnnouncementBroadcast(qApp);
+    return theInstance;
+}
+
+AnnouncementBroadcast::AnnouncementBroadcast(QObject *parent) : QObject(parent)
+{
+    // CAPTURE_CALL_GRAPH;
+}
+
+AnnouncementBroadcast::~AnnouncementBroadcast() { }
+
+void AnnouncementBroadcast::doShout(Announcement *from, const QString &type, const QJSValue &data)
+{
+    emit shout(from, type, data);
+}

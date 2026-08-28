@@ -1,0 +1,99 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../globals"
+
+Loader {
+    id: root
+
+    property Component menu
+
+    active: false
+    sourceComponent: menu
+
+    function show() {
+        if(!enabled)
+            return
+
+        _private.itemInitMode = "show"
+        active = true
+    }
+
+    function popup() {
+        if(!enabled)
+            return
+
+        _private.itemInitMode = "popup"
+        active = true
+    }
+
+    function dismiss() {
+        if(item)
+            item.dismiss()
+
+        Runtime.execLater( root, 0, function() { root.active = false } )
+    }
+
+    function close() { dismiss() }
+
+    onActiveChanged: {
+        if(active === false)
+            _private.itemInitMode = "show"
+    }
+
+    onItemChanged: {
+        if( item ) {
+            if( Object.isOfType(item, "QQuickMenu") ) {
+                item.enabled = false
+                if(_private.itemInitMode === "popup")
+                    item.popup()
+                else if(_private.itemInitMode === "show")
+                    item.visible = true
+            } else
+                console.log("Using MenuLoader for anything other than Menu {} item is prohibited.")
+        }
+    }
+
+    DelayedProperty {
+        set: parent.item ? true : false
+        delay: 100
+        initial: false
+
+        onGetChanged: {
+            if(parent.item)
+                parent.item.enabled = get
+        }
+    }
+
+    Connections {
+        target: root.item
+        ignoreUnknownSignals: true
+
+        function onVisibleChanged() { root.dismiss() }
+    }
+
+    QtObject {
+        id: _private
+
+        property string itemInitMode: "show"
+    }
+}

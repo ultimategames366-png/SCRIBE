@@ -1,0 +1,200 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+pragma Singleton
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+import "../helpers"
+
+Rectangle {
+    id: root
+
+    function init() { }
+
+    anchors.fill: parent
+
+    parent: NotificationsLayer.item
+
+    color: Color.translucent(Runtime.colors.primary.borderColor, 0.6)
+    visible: NotificationsLayer.valid && Scrite.notifications.count > 0
+    focus: visible
+
+    MouseArea {
+        anchors.fill: parent
+
+        enabled: parent.visible
+        hoverEnabled: true
+        propagateComposedEvents: false
+    }
+
+    Flickable {
+        id: _flickable
+
+        anchors.top: parent.top
+        anchors.topMargin: -1
+        anchors.horizontalCenter: parent.horizontalCenter
+
+        width: parent.width * 0.6
+        height: Math.min( contentHeight, parent.height*0.25 )
+
+        visible: height > 0
+
+        contentWidth: width
+        contentHeight: _layout.implicitHeight
+
+        Column {
+            id: _layout
+
+            width: _flickable.width
+
+            spacing: 10
+
+            Repeater {
+                model: Scrite.notifications.count
+
+                delegate: Rectangle {
+                    id: _delegate
+
+                    required property int index
+                    property Notification notification: Scrite.notifications.notificationAt(index)
+
+                    width: _flickable.width-1
+                    height: Math.max(100, _delegateLayout.implicitHeight+44)
+
+                    color: Runtime.colors.tx(notification.color)
+                    border { width: 1; color: Runtime.colors.primary.borderColor }
+
+                    RowLayout {
+                        id: _delegateLayout
+
+                        anchors.centerIn: parent
+
+                        width: parent.width-44
+
+                        spacing: 16
+
+                        Rectangle {
+                            Layout.preferredWidth: parent.width*0.25
+                            Layout.preferredHeight: {
+                                if(_delegateImage.status === Image.Ready) {
+                                    return _delegateImage.sourceSize.height * (Layout.preferredWidth/_delegateImage.sourceSize.width)
+                                }
+
+                                return Layout.preferredWidth*9/16
+                            }
+
+                            visible: _delegate.notification.hasImage
+                            border.width: 1
+                            border.color: Runtime.colors.primary.borderColor
+
+                            Image {
+                                id: _delegateImage
+
+                                anchors.fill: parent
+                                anchors.margins: 1
+
+                                fillMode: Image.PreserveAspectFit
+                                mipmap: true
+                                source: _delegate.notification.image
+
+                                MouseArea {
+                                    anchors.fill: parent
+
+                                    onClicked: _delegate.notification.notifyImageClick()
+                                }
+                            }
+
+                            BusyIndicator {
+                                anchors.centerIn: parent
+
+                                running: _delegateImage.status !== Image.Ready
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignTop
+
+                            spacing: 12
+
+                            VclLabel {
+                                Layout.fillWidth: true
+
+                                color: Runtime.colors.tx(_delegate.notification.textColor)
+                                font.bold: true
+                                text: _delegate.notification.title
+                                visible: text !== ""
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+
+                                font.pointSize: Runtime.idealFontMetrics.font.pointSize + 2
+                            }
+
+                            VclLabel {
+                                Layout.fillWidth: true
+
+                                color: Runtime.colors.tx(_delegate.notification.textColor)
+                                text: _delegate.notification.text
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 4
+                                elide: Text.ElideRight
+
+                                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                            }
+
+                            Flow {
+                                spacing: 12
+
+                                Layout.fillWidth: true
+
+                                Repeater {
+                                    model: _delegate.notification.buttons
+
+                                    delegate: Link {
+                                        required property int index
+                                        required property string modelData
+
+                                        text: modelData
+
+                                        onClicked: _delegate.notification.notifyButtonClick(index)
+                                    }
+                                }
+
+                                Link {
+                                    text: "Dismiss"
+                                    visible: !_delegate.notification.autoClose && !_delegate.notification.hasButtons
+
+                                    onClicked: Scrite.notifications.dismissNotification(_delegate.index)
+                                }
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+    }
+}

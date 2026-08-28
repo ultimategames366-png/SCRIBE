@@ -1,0 +1,103 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+
+ToolTip {
+    id: root
+
+    readonly property real maximumContentWidth: 350
+    property bool parseShortcutInText: true
+    property color textColor: Runtime.colors.primary.c100.text
+
+    property Item container: parent
+
+    DelayedProperty.watch: Runtime.visibleTooltipCount
+    DelayedProperty.delay: Runtime.stdAnimationDuration
+
+    x: 20
+    y: container.height + 15
+
+    delay: DelayedProperty.value > 0 ? 0 : Scrite.app.styleHints.mousePressAndHoldInterval
+    contentWidth: Math.min(_content.implicitWidth, maximumContentWidth)
+
+    background: Rectangle {
+        color: Runtime.colors.primary.c100.background
+        border.width: 1
+        border.color: Runtime.colors.primary.borderColor
+        opacity: 0.9
+    }
+
+    contentItem: RowLayout {
+        id: _content
+
+        property var fields: {
+            if(!root.parseShortcutInText)
+                return [root.text]
+
+            let label = "", shortcut = ""
+
+            const text = root.text
+            const boIndex = text.indexOf('(')
+            if(boIndex > 0) {
+                const bcIndex = text.lastIndexOf(')')
+                shortcut = text.slice(boIndex+1, bcIndex > boIndex ? bcIndex : text.length-1).trim()
+                label = text.slice(0, boIndex).trim()
+            } else {
+                const comps = text.split("\t")
+                label = comps[0].trim()
+                shortcut = comps.length > 1 ? comps[comps.length-1].trim() : ""
+            }
+
+            if(shortcut === "undefined")
+                return [label]
+
+            const portableShortcut = Gui.portableShortcut(shortcut)
+            if(shortcut === "" || portableShortcut === "")
+                return [text]
+            return [label, portableShortcut]
+        }
+
+        spacing: 20
+
+        Text {
+            Layout.fillWidth: true
+
+            font: Runtime.idealFontMetrics.font
+            text: _content.fields[0]
+            color: root.textColor
+            wrapMode: Text.WordWrap
+        }
+
+        ShortcutField {
+            visible: _content.fields.length > 1 && portableShortcut !== ""
+            readOnly: true
+            description: ""
+            portableShortcut: _content.fields.length > 1 ? _content.fields[_content.fields.length-1] : ""
+        }
+    }
+
+    exit: null
+    enter: null
+
+    onAboutToShow: Runtime.visibleTooltipCount = Runtime.visibleTooltipCount + 1
+    onAboutToHide: Runtime.visibleTooltipCount = Runtime.visibleTooltipCount - 1
+}

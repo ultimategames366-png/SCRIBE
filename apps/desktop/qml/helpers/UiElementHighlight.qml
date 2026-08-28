@@ -1,0 +1,222 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Window
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+/**
+  This item is used for highlighting UI elements to educate users about where
+  certain options are present.
+  */
+
+Item {
+    id: root
+
+    property int descriptionPosition: Item.Right
+
+    property string description
+
+    property bool uiElementBoxVisible: false
+    property bool highlightAnimationEnabled: true
+
+    property Item uiElement
+
+    signal done()
+    signal scaleAnimationDone()
+
+    ItemPositionMapper {
+        id: _uiElementPosition
+
+        to: root
+        from: root.uiElement
+    }
+
+    Item {
+        id: _uiElementOverlay
+
+        x: _uiElementPosition.mappedPosition.x
+        y: _uiElementPosition.mappedPosition.y
+        width: root.uiElement ? (root.uiElement.width * root.uiElement.scale) : 0
+        height: root.uiElement ? (root.uiElement.height * root.uiElement.scale) : 0
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -2.5
+
+            color: Qt.rgba(0,0,0,0)
+            visible: root.uiElementBoxVisible
+
+            border.width: 2
+            border.color: Runtime.colors.accent.highlight.background
+        }
+
+        BoxShadow {
+            anchors.fill: _descTip
+        }
+
+        Rectangle {
+            id: _descTip
+
+            width: _descLabel.width
+            height: _descLabel.height
+
+            color: Runtime.colors.accent.highlight.background
+            border.width: 1
+            border.color: Runtime.colors.accent.borderColor
+
+            VclLabel {
+                id: _descLabel
+
+                text: root.description
+                color: Runtime.colors.accent.highlight.text
+
+                font.bold: true
+                font.pointSize: Runtime.idealFontMetrics.font.pointSize+2
+
+                topPadding: root.descriptionPosition === Item.Bottom || root.descriptionPosition === Item.Top ? _descIcon.height : 10
+                leftPadding: (root.descriptionPosition === Item.Right ? _descIcon.width : (root.descriptionPosition === Item.Bottom || root.descriptionPosition === Item.Top ? 20 : 0)) + 5
+                rightPadding: (root.descriptionPosition === Item.Left ? _descIcon.width : (root.descriptionPosition === Item.Bottom || root.descriptionPosition === Item.Top ? 20 : 0)) + 5
+                bottomPadding: root.descriptionPosition === Item.Top || root.descriptionPosition === Item.Bottom ? _descIcon.height : 10
+
+                Image {
+                    id: _descIcon
+
+                    width: Runtime.idealFontMetrics.height
+                    height: width
+                    smooth: true
+
+                    source: {
+                        switch(root.descriptionPosition) {
+                        case Item.Right:
+                            return "image://icon/dark/qrc:/icons/navigation/arrow_left.png"
+                        case Item.Right:
+                            return "image://icon/dark/qrc:/icons/navigation/arrow_right.png"
+                        case Item.Top:
+                        case Item.TopLeft:
+                        case Item.TopRight:
+                            return "image://icon/dark/qrc:/icons/navigation/arrow_down.png"
+                        case Item.Bottom:
+                        case Item.BottomLeft:
+                        case Item.BottomRight:
+                            return "image://icon/dark/qrc:/icons/navigation/arrow_up.png"
+                        }
+                    }
+                }
+            }
+
+            Component.onCompleted: {
+                switch(root.descriptionPosition) {
+                case Item.Right:
+                    _descTip.anchors.verticalCenter = _uiElementOverlay.verticalCenter
+                    _descTip.anchors.left = _uiElementOverlay.right
+                    _descIcon.anchors.verticalCenter = _descLabel.verticalCenter
+                    _descIcon.anchors.left = _descLabel.left
+                    break
+                case Item.Left:
+                    _descTip.anchors.verticalCenter = _uiElementOverlay.verticalCenter
+                    _descTip.anchors.right = _uiElementOverlay.left
+                    _descIcon.anchors.verticalCenter = _descLabel.verticalCenter
+                    _descIcon.anchors.right = _descLabel.right
+                    break
+                case Item.Top:
+                case Item.TopLeft:
+                case Item.TopRight:
+                    if(root.descriptionPosition === Item.Top) {
+                        _descTip.anchors.horizontalCenter = _uiElementOverlay.horizontalCenter
+                        _descIcon.anchors.horizontalCenter = _descLabel.horizontalCenter
+                    } else if(root.descriptionPosition === Item.TopRight) {
+                        _descTip.anchors.left = _uiElementOverlay.left
+                        _descTip.anchors.leftMargin = _descLabel.leftPadding
+                        _descIcon.anchors.left = _descLabel.left
+                        _descIcon.anchors.leftMargin = _descLabel.leftPadding
+                    } else {
+                        _descTip.anchors.right = _uiElementOverlay.right
+                        _descTip.anchors.rightMargin = _descLabel.rightPadding
+                        _descIcon.anchors.right = _descLabel.right
+                        _descIcon.anchors.right = _descLabel.rightPadding
+                    }
+                    _descTip.anchors.bottom = _uiElementOverlay.top
+                    _descIcon.anchors.bottom = _descLabel.bottom
+                    break
+                case Item.Bottom:
+                case Item.BottomLeft:
+                case Item.BottomRight:
+                    if(root.descriptionPosition === Item.Top) {
+                        _descTip.anchors.horizontalCenter = _uiElementOverlay.horizontalCenter
+                        _descIcon.anchors.horizontalCenter = _descLabel.horizontalCenter
+                    } else if(root.descriptionPosition === Item.BottomRight) {
+                        _descTip.anchors.left = _uiElementOverlay.left
+                        _descTip.anchors.leftMargin = _descLabel.leftPadding
+                        _descIcon.anchors.left = _descLabel.left
+                        _descIcon.anchors.leftMargin = _descLabel.leftPadding
+                    } else {
+                        _descTip.anchors.right = _uiElementOverlay.right
+                        _descTip.anchors.rightMargin = _descLabel.rightPadding
+                        _descIcon.anchors.right = _descLabel.right
+                        _descIcon.anchors.rightMargin = _descLabel.rightPadding
+                    }
+                    _descTip.anchors.top = _uiElementOverlay.bottom
+                    _descIcon.anchors.top = _descLabel.top
+                    break
+                }
+            }
+        }
+    }
+
+    SequentialAnimation {
+        running: true
+
+        NumberAnimation {
+            target: root.uiElement
+            property: "scale"
+            from: 1; to: root.highlightAnimationEnabled ? 2 : 1
+            duration: 500
+        }
+
+        PauseAnimation {
+            duration: 250
+        }
+
+        NumberAnimation {
+            target: root.uiElement
+            property: "scale"
+            from: root.highlightAnimationEnabled ? 2 : 1; to: 1
+            duration: 500
+        }
+
+        ScriptAction {
+            script: root.scaleAnimationDone()
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        onClicked: root.done()
+    }
+
+    Timer {
+        running: true
+        repeat: false
+        interval: 4000
+        onTriggered: root.done()
+    }
+}

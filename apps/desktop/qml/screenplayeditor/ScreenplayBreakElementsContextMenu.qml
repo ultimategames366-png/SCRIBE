@@ -1,0 +1,82 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../dialogs"
+import "../controls"
+
+VclMenu {
+    id: root
+
+    property ScreenplayElement element
+
+    onClosed: element = null
+
+    VclMenuItem {
+        text: "Paste After"
+
+        enabled: Scrite.document.screenplay.canPaste && !Scrite.document.screenplay.hasSelectedElements
+
+        onClicked: {
+            const index = Scrite.document.screenplay.indexOfElement(root.element);
+            Scrite.document.screenplay.pasteAfter(index)
+            root.close()
+        }
+    }
+
+    VclMenuItem {
+        text: "Remove"
+
+        enabled: !Scrite.document.readOnly && !Scrite.document.screenplay.hasSelectedElements
+
+        onClicked: {
+            Scrite.document.screenplay.removeElement(root.element)
+            root.close()
+        }
+    }
+
+    VclMenu {
+        title: "Reports"
+
+        width: 250
+        enabled: !Scrite.document.screenplay.hasSelectedElements && root.element && root.element.breakType === Screenplay.Episode
+
+        Repeater {
+            model: Runtime.episodeReports.reports ? Runtime.episodeReports.reports : 0
+
+            delegate: VclMenuItem {
+                required property int index
+                required property var modelData
+
+                text: modelData.name
+                icon.source: Runtime.themedIcon("qrc" + modelData.icon)
+
+                onTriggered: {
+                    let props = {}
+                    props[Runtime.episodeReports.propertyName] = [root.element.episodeIndex+1]
+                    ReportConfigurationDialog.launch(modelData.name, props, {initialPage: modelData.group})
+                }
+            }
+        }
+    }
+}

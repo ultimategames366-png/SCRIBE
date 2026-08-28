@@ -1,0 +1,87 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+
+import "../globals"
+import "../dialogs"
+import "../helpers"
+import "../controls"
+
+VclMenu {
+    id: root
+
+    property Item popupSource
+
+    property string characterName
+
+    width: 350
+
+    onAboutToHide: {
+        popupSource = null
+        characterName = ""
+    }
+
+    Repeater {
+        model: Runtime.characterReports.reports ? Runtime.characterReports.reports : 0
+
+        delegate: VclMenuItem {
+            required property int index
+            required property var modelData
+
+            text: modelData.name
+            icon.source: Runtime.themedIcon("qrc" + modelData.icon)
+
+            onTriggered: {
+                let props = {}
+                props[Runtime.characterReports.propertyName] = [root.characterName]
+                ReportConfigurationDialog.launch(modelData.name, props, {initialPage: modelData.group})
+            }
+        }
+    }
+
+    MenuSeparator { }
+
+    VclMenuItem {
+        text: "Character Notes"
+        icon.source: Runtime.themedIcon("qrc:/icons/content/note.png")
+
+        onTriggered: {
+            let characterNotes = ActionHub.notebookOperations.find("characterNotes")
+            characterNotes.characterName = root.characterName
+            characterNotes.trigger()
+        }
+    }
+
+    VclMenuItem {
+        text: "Rename/Merge Character"
+        icon.source: Runtime.themedIcon("qrc:/icons/screenplay/character.png")
+
+        onTriggered: {
+            const character = Scrite.document.structure.addCharacter(root.characterName)
+            if(character)
+                RenameCharacterDialog.launch(character)
+        }
+    }
+}

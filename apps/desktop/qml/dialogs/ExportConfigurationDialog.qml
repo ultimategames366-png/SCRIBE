@@ -1,0 +1,94 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma Singleton
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+
+import "../globals"
+import "../controls"
+
+Item {
+    id: root
+
+    parent: Scrite.window.contentItem
+
+    function launch(exporter) {
+        if(_private.dialogComponent.status !== Component.Ready) {
+            console.log("ExportConfigurationDialog is not ready! " + _private.dialogComponent.errorString())
+            return null
+        }
+
+        if(!exporter) {
+            console.log("No exporter supplied.")
+            return null
+        }
+
+        if(!ActionHub.isOperationAllowedByUser("Exporting to another format")) {
+            return false
+        }
+
+        var args = {
+            exporter: null
+        }
+
+        if(typeof exporter === "string") {
+            if(_private.dialog) {
+                if(_private.dialog.exporter.format === exporter)
+                    return _private.dialog
+                _private.dialog.close()
+            }
+            args.exporter = Scrite.document.createExporter(exporter)
+        } else if(Object.isOfType(exporter, "AbstractExporter")) {
+            if(_private.dialog) {
+                if(_private.dialog.exporter === exporter)
+                    return _private.dialog
+                _private.dialog.close()
+            }
+            args.exporter = exporter
+        } else {
+            if(_private.dialog)
+                _private.dialog.close()
+            console.log("No exporter supplied.")
+            return null
+        }
+
+        Object.load(args.exporter)
+
+        var dlg = _private.dialogComponent.createObject(root, args)
+        if(dlg) {
+            _private.dialog = dlg
+            dlg.closed.connect(dlg.destroy)
+            dlg.open()
+            return dlg
+        }
+
+        console.log("Couldn't launch ExportConfigurationDialog")
+        return null
+    }
+
+    QtObject {
+        id: _private
+
+        property Component dialogComponent: Qt.createComponent("./exportconfigurationdialog/impl_ExportConfigurationDialog.qml", Component.PreferSynchronous, root)
+        property VclDialog dialog
+    }
+}

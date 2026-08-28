@@ -1,0 +1,421 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../"
+import "../../globals"
+import "../../helpers"
+import "../../controls"
+
+Item {
+    id: root
+
+    height: _layout.height+50
+
+    GridLayout {
+        id: _layout
+
+        y: 10
+        width: parent.width-20
+        columns: 2
+        rowSpacing: 20
+        columnSpacing: 20
+
+        GroupBox {
+            Layout.alignment: Qt.AlignTop
+            Layout.preferredWidth: (_layout.width-_layout.columnSpacing)/2
+            Layout.fillHeight: true
+
+            label: VclLabel { text: "Graphics" }
+
+            ColumnLayout {
+                width: parent.width
+
+                spacing: 0
+
+                VclCheckBox {
+                    TabSequenceItem.sequence: 0
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: "Enable Animations"
+                    checked: Runtime.applicationSettings.enableAnimations
+
+                    onToggled: Runtime.applicationSettings.enableAnimations = checked
+                }
+
+                VclCheckBox {
+                    id: _useNativeTextRendering
+
+                    TabSequenceItem.sequence: 1
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: "Use Native Text Rendering"
+                    checked: Runtime.applicationSettings.useNativeTextRendering
+
+                    onToggled: {
+                        Runtime.applicationSettings.useNativeTextRendering = checked
+
+                        if(Runtime.applicationSettings.useNativeTextRendering !== checked) {
+                            const msg = checked ? "Native OS text rendering engine will be used when you restart Scrite." : "Qt's text renderning engine will be used when you restart Scrite."
+                            MessageBox.information("Requires Restart", msg)
+                        }
+                    }
+
+                    ToolTipPopup {
+                        container: _useNativeTextRendering
+                        text: "If texts are not being rendered properly on your display, then switch to native text rendering. Otherwise, keep this setting unchecked."
+                        visible: _useNativeTextRendering.hovered
+                    }
+                }
+
+                VclCheckBox {
+                    id: _useSoftwareRenderer
+
+                    TabSequenceItem.sequence: 2
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: "Use Software Renderer"
+                    checked: Runtime.applicationSettings.useSoftwareRenderer
+
+                    onToggled: {
+                        Runtime.applicationSettings.useSoftwareRenderer = checked
+
+                        if(Runtime.currentUseSoftwareRenderer !== checked) {
+                            const msg = checked ? "Software renderer will be used when you restart Scrite." : "Accelerated graphics renderer will be used when you restart Scrite."
+                            MessageBox.information("Requires Restart", msg)
+                        }
+                    }
+
+                    ToolTipPopup {
+                        container: _useSoftwareRenderer
+                        text: "If you feel that Scrite is not responding fast enough, then you may want to switch to using a Software Renderer to speed things up. Otherwise, keep this option unchecked for best experience."
+                        visible: _useSoftwareRenderer.hovered
+                    }
+                }
+            }
+        }
+
+        GroupBox {
+            Layout.alignment: Qt.AlignTop
+            Layout.preferredWidth: (_layout.width-_layout.columnSpacing)/2
+            Layout.fillHeight: true
+
+            label: VclLabel { text: "Display" }
+            clip: true
+
+            GridLayout {
+                width: parent.width
+
+                columns: 2
+                rowSpacing: Runtime.idealFontMetrics.lineSpacing
+
+                VclLabel {
+                    Layout.alignment: Qt.AlignVCenter
+
+                    text: "DPI:"
+                    padding: 5
+                }
+
+                VclTextField {
+                    Layout.fillWidth: true
+
+                    TabSequenceItem.sequence: 3
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: Scrite.document.displayFormat.pageLayout.customResolution > 0 ? (Scrite.document.displayFormat.pageLayout.customResolution + (activeFocus ? "" : " dpi")) : ""
+                    placeholderText: "Default: " + Math.round(Scrite.document.displayFormat.pageLayout.defaultResolution) + ". Leave empty, or enter a custom value."
+
+                    onEditingComplete: {
+                        var value = parseFloat(text)
+                        if(isNaN(value))
+                            Scrite.document.displayFormat.pageLayout.customResolution = 0
+                        else
+                            Scrite.document.displayFormat.pageLayout.customResolution = value
+                    }
+                }
+
+                VclLabel {
+                    Layout.alignment: Qt.AlignVCenter
+
+                    text: "Scale:"
+                    padding: 5
+                }
+
+                VclTextField {
+                    Layout.fillWidth: true
+
+                    TabSequenceItem.sequence: 4
+                    TabSequenceItem.manager: _tabSequence
+
+                    enabled: false
+                    text: "Follows OS Settings"
+                }
+
+                VclLabel {
+                    Layout.alignment: Qt.AlignVCenter
+
+                    text: "Font Size:"
+                    padding: 5
+                }
+
+                VclTextField {
+                    Layout.fillWidth: true
+                    TabSequenceItem.sequence: 5
+                    TabSequenceItem.manager: _tabSequence
+
+                    function applyCustomFontSize() {
+                        if(length > 0)
+                            Scrite.app.customFontPointSize = parseInt(text)
+                        else
+                            Scrite.app.customFontPointSize = 0
+                    }
+
+                    text: (Scrite.app.customFontPointSize === 0 ? Runtime.idealFontMetrics.font.pointSize : Scrite.app.customFontPointSize) + (activeFocus ? "" : " pt")
+                    placeholderText: "Ideal font point-size to use for all text in the UI."
+
+                    onEditingComplete: applyCustomFontSize()
+
+                    validator: IntValidator {
+                        bottom: 0; top: 100
+                    }
+                }
+            }
+        }
+
+        GroupBox {
+            Layout.alignment: Qt.AlignTop
+            Layout.preferredWidth: (_layout.width-_layout.columnSpacing)/2
+            Layout.fillHeight: true
+
+            label: VclLabel { text: "Window Tabs" }
+
+            ColumnLayout {
+                width: parent.width
+                spacing: 5
+
+                VclLabel {
+                    property string secondSentence: {
+                        if(Runtime.canShowNotebookInStructure)
+                            return ""
+                        return "(Expand the window by " + 10*Math.ceil((Runtime.minWindowWidthForShowingNotebookInStructure - Runtime.width)/10) + " pixels to enable this option)"
+                    }
+
+                    Layout.fillWidth: true
+                    font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+                    text: "Move Notebook into the Structure tab to see all three aspects of your screenplay in a single view. " + secondSentence
+                    wrapMode: Text.WordWrap
+                }
+
+                VclCheckBox {
+                    Layout.fillWidth: true
+                    TabSequenceItem.sequence: 6
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: "Stack Structure & Notebook"
+                    checked: Runtime.showNotebookInStructure
+                    enabled: Runtime.canShowNotebookInStructure
+
+                    onToggled: {
+                        Runtime.workspaceSettings.showNotebookInStructure = checked
+                        if(checked) {
+                            Runtime.workspaceSettings.animateStructureIcon = true
+                            Runtime.workspaceSettings.animateNotebookIcon = true
+                        }
+                    }
+                }
+
+                VclCheckBox {
+                    Layout.fillWidth: true
+                    TabSequenceItem.sequence: 7
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: "Show Scrited Tab"
+                    checked: Runtime.workspaceSettings.showScritedTab
+
+                    onToggled: {
+                        Runtime.workspaceSettings.showScritedTab = checked
+                        if(!checked && Runtime.mainWindowTab === Runtime.MainWindowTab.ScritedTab) {
+                            try {
+                                Runtime.activateMainWindowTab(Runtime.MainWindowTab.ScreenplayTab)
+                            } catch(e) {
+                                console.log(e)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        GroupBox {
+            Layout.alignment: Qt.AlignTop
+            Layout.preferredWidth: (_layout.width-_layout.columnSpacing)/2
+            Layout.fillHeight: true
+            Layout.rowSpan: 2
+
+            label: VclLabel { text: "Saving Files" }
+            clip: true
+
+            GridLayout {
+                width: parent.width
+                columns: 2
+
+                VclCheckBox {
+                    TabSequenceItem.sequence: 8
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: "Auto Save"
+                    checked: Scrite.document.autoSave
+
+                    onToggled: Scrite.document.autoSave = checked
+                }
+
+                VclTextField {
+                    TabSequenceItem.sequence: 9
+                    TabSequenceItem.manager: _tabSequence
+
+                    label: enabled ? "Interval in seconds:" : ""
+
+                    text: enabled ? (Scrite.document.autoSaveDurationInSeconds + (activeFocus ? "" :  " seconds")): "No Auto Save"
+                    enabled: Scrite.document.autoSave
+
+                    validator: IntValidator {
+                        bottom: 1; top: 3600
+                    }
+                    onTextEdited: Scrite.document.autoSaveDurationInSeconds = parseInt(text)
+                }
+
+                VclCheckBox {
+                    TabSequenceItem.sequence: 10
+                    TabSequenceItem.manager: _tabSequence
+
+                    text: "Limit Backups"
+                    checked: Scrite.document.maxBackupCount > 0
+
+                    onToggled: Scrite.document.maxBackupCount = checked ? 20 : 0
+                }
+
+                VclTextField {
+                    TabSequenceItem.sequence: 11
+                    TabSequenceItem.manager: _tabSequence
+
+                    label: enabled ? "Number of backups to retain:" : ""
+                    text: enabled ? (Scrite.document.maxBackupCount + (activeFocus ? "" : " backups")) : "Unlimited Backups"
+                    enabled: Scrite.document.maxBackupCount > 0
+
+                    validator: IntValidator {
+                        bottom: 1; top: 3600
+                    }
+                    onTextEdited: Scrite.document.maxBackupCount = parseInt(text)
+                }
+
+                VclCheckBox {
+                    TabSequenceItem.sequence: 12
+                    TabSequenceItem.manager: _tabSequence
+
+                    Layout.columnSpan: 2
+                    Layout.fillWidth: true
+
+                    text: "Enable Restore (" + (Scrite.document.autoSave ? "New Files Only" : "All Files") + ")"                    
+                    checked: Scrite.vault.enabled
+                    onToggled: Scrite.vault.enabled = checked
+                }
+
+                VclCheckBox {
+                    TabSequenceItem.sequence: 13
+                    TabSequenceItem.manager: _tabSequence
+
+                    Layout.columnSpan: 2
+                    Layout.fillWidth: true
+
+                    text: "Ask to Reload if File Changes"
+                    checked: Runtime.applicationSettings.reloadPrompt
+                    onToggled: Runtime.applicationSettings.reloadPrompt = checked
+                }
+
+                VclCheckBox {
+                    TabSequenceItem.sequence: 14
+                    TabSequenceItem.manager: _tabSequence
+
+                    Layout.columnSpan: 2
+                    Layout.fillWidth: true
+
+                    text: "Notify Missing Recent Files"
+                    checked: Runtime.applicationSettings.notifyMissingRecentFiles
+                    onToggled: Runtime.applicationSettings.notifyMissingRecentFiles = checked
+                }
+            }
+        }
+
+        GroupBox {
+            Layout.alignment: Qt.AlignTop
+            Layout.preferredWidth: (_layout.width-_layout.columnSpacing)/2
+            Layout.fillHeight: true
+
+            label: VclLabel { text: Platform.isMacOSDesktop ? "Scroll/Flick Speed (Windows/Linux Only)" : "Scroll/Flick Speed" }
+            enabled: !Platform.isMacOSDesktop
+            opacity: enabled ? 1 : 0.5
+
+            RowLayout {
+                width: parent.width
+
+                Slider {
+                    id: _flickSpeedSlider
+
+                    Layout.fillWidth: true
+
+                    TabSequenceItem.sequence: 15
+                    TabSequenceItem.manager: _tabSequence
+
+                    from: 0.1
+                    to: 3
+                    value: Runtime.workspaceSettings.flickScrollSpeedFactor
+                    stepSize: 0.1
+                    snapMode: Slider.SnapAlways
+                    onMoved: Runtime.workspaceSettings.flickScrollSpeedFactor = value
+
+                    ToolTipPopup {
+                        container: _flickSpeedSlider
+                        text: "Configure the scroll sensitivity of your mouse and trackpad."
+                        visible: _flickSpeedSlider.hovered
+                    }
+                }
+
+                VclLabel {
+                    text: Math.round( _flickSpeedSlider.value*100 ) + "%"
+                }
+
+                FlatToolButton {
+                    TabSequenceItem.sequence: 16
+                    TabSequenceItem.manager: _tabSequence
+
+                    iconSource: Runtime.themedIcon("qrc:/icons/action/reset.png")
+                    toolTipText: "Reset flick/scroll speed to 100%"
+
+                    onClicked: Runtime.workspaceSettings.flickScrollSpeedFactor = 1
+                }
+            }
+        }
+    }
+
+    TabSequenceManager {
+        id: _tabSequence
+    }
+}

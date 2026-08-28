@@ -1,0 +1,179 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+
+import io.scrite.components
+
+
+import "../../globals"
+import "../../helpers"
+import "../../dialogs"
+import "../../controls"
+import ".."
+
+VclMenu {
+    id: root
+
+    property StructureElement element
+
+    signal refitSelectionRequest()
+    signal ensureItemVisibleRequest(Item item)
+    signal deleteElementRequest(StructureElement element)
+
+    width: 250
+
+    VclMenuItem {
+        action: Action {
+            text: "Scene Heading"
+            checkable: true
+            checked: root.element ? root.element.scene.heading.enabled : false
+        }
+        enabled: root.element
+
+        onTriggered: {
+            root.element.scene.heading.enabled = action.checked
+            root.element = null
+        }
+    }
+
+    ColorMenu {
+        title: "Color"
+        enabled: root.element
+
+        onMenuItemClicked: (color) => {
+            root.element.scene.color = color
+            root.element = null
+        }
+    }
+
+    MarkSceneAsMenu {
+        title: "Mark Scene As"
+        scene: root.element ? root.element.scene : null
+
+        onTriggered: root.element = null
+    }
+
+    VclMenuItem {
+        property Scene lastScene: Scrite.document.screenplay.elementCount > 0 && Scrite.document.screenplay.elementAt(Scrite.document.screenplay.elementCount-1).scene
+
+        text: "Add To Timeline"
+        enabled: root.element && root.element.scene !== lastScene
+
+        onClicked: {
+            let lastScreenplayScene = null
+            if(Scrite.document.screenplay.elementCount > 0)
+                lastScreenplayScene = Scrite.document.screenplay.elementAt(Scrite.document.screenplay.elementCount-1).scene
+            if(lastScreenplayScene === null || root.element.scene !== lastScreenplayScene)
+                Scrite.document.screenplay.addScene(root.element.scene)
+            root.element = null
+        }
+    }
+
+    VclMenuItem {
+        text: "Remove From Timeline"
+        enabled: root.element && root.element.scene.addedToScreenplay
+
+        onClicked: {
+            Scrite.document.screenplay.removeSceneElements(root.element.scene)
+            root.ensureItemVisibleRequest(root.element.follow)
+            root.element = null
+        }
+    }
+
+    VclMenuItem {
+        text: "Make Sequence"
+
+        enabled: !Scrite.document.readOnly && _sceneGroup.canBeStacked
+
+        onTriggered: {
+            if(!_sceneGroup.stack()) {
+                MessageBox.information("Make Sequence Error",
+                                       "Couldn't stack these scenes to make a sequence. Please try doing this on the Structure Tab.")
+            }
+        }
+    }
+
+    VclMenuItem {
+        text: "Break Sequence"
+
+        enabled: !Scrite.document.readOnly && _sceneGroup.canBeUnstacked
+
+        onTriggered: {
+            if(!_sceneGroup.unstack()) {
+                MessageBox.information("Break Sequence Error",
+                                       "Couldn't unstack these scenes to make a sequence. Please try doing this on the Structure Tab.")
+            }
+        }
+    }
+
+    StructureGroupsMenu {
+        sceneGroup: _sceneGroup
+        enabled: !Scrite.document.readOnly
+
+        onToggled: root.refitSelectionRequest()
+    }
+
+    VclMenuItem {
+        text: "Keywords"
+        enabled: !Scrite.document.readOnly
+
+        onClicked: SceneGroupKeywordsDialog.launch(_sceneGroup)
+    }
+
+    VclMenuItem {
+        text: "Index Card Fields"
+        enabled: root.element
+
+        onClicked: StructureIndexCardFieldsDialog.launch()
+    }
+
+    MenuSeparator { }
+
+    VclMenuItem {
+        text: "Delete"
+        enabled: root.element
+
+        onClicked: {
+            let element = root.element
+            root.element = null
+            if(Scrite.document.structure.canvasUIMode === Structure.IndexCardUI && element.follow)
+                element.follow.confirmAndDeleteSelf()
+            else
+                root.deleteElementRequest(element)
+        }
+    }
+
+    SceneGroup {
+        id: _sceneGroup
+
+        structure: Scrite.document.structure
+    }
+
+    onClosed: _sceneGroup.clearScenes()
+    onAboutToShow: {
+        _sceneGroup.clearScenes()
+        _sceneGroup.addScene(root.element.scene)
+    }
+
+    onElementChanged: {
+        if(element)
+            popup()
+        else
+            close()
+    }
+}

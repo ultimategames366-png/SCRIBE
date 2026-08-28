@@ -1,0 +1,243 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma Singleton
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../../globals"
+import "../../controls"
+import "../../helpers"
+import "../../dialogs"
+
+DialogLauncher {
+    id: root
+
+    parent: Scrite.window.contentItem
+
+    function launch(character) { return doLaunch({"character": character}) }
+
+    name: "AddRelationshipDialog"
+    singleInstanceOnly: true
+
+    dialogComponent: VclDialog {
+        id: _dialog
+
+        property Character character
+
+        width: 750
+        height: 600
+        title: "Add Relationship"
+
+        contentItem: Item {
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 20
+                spacing: 10
+
+                SearchBar {
+                    id: _searchBar
+
+                    Layout.fillWidth: true
+
+                    searchEngine.objectName: "Characters Search Engine"
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    border.color: Runtime.colors.primary.borderColor
+                    color: Runtime.colors.primary.c100.background
+
+                    TabSequenceManager {
+                        id: _characterListTabManager
+                    }
+
+                    ListView {
+                        id: _charactersListView
+
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        anchors.leftMargin: 5
+
+                        clip: true
+                        reuseItems: false
+
+                        ScrollBar.vertical: VclScrollBar { }
+
+                        highlight: Item { }
+                        highlightFollowsCurrentItem: true
+                        highlightMoveDuration: 0
+                        highlightResizeDuration: 0
+
+                        model: _dialog.character.unrelatedCharacterNames()
+                        delegate: Rectangle {
+                            id: _characterRowItem
+
+                            required property int index
+                            required property string modelData
+
+                            property string thisCharacterName: SMath.titleCased(_dialog.character.name)
+                            property string otherCharacterName: modelData
+                            property bool   checked: _relationshipName.length > 0
+                            property string relationship: _relationshipName.text
+
+                            property bool  highlight: false
+                            property color backgroundColor: highlight ? Runtime.colors.accent.c100.background : Runtime.colors.primary.c10.background
+                            property color foregroundColor: highlight ? Runtime.colors.accent.c100.text : Runtime.colors.primary.editor.text
+
+                            width: _charactersListView.width
+                            height: _characterRow.height*1.15
+                            color: backgroundColor
+
+                            SearchAgent.engine: _searchBar.searchEngine
+                            SearchAgent.onSearchRequest: (string) => {
+                                SearchAgent.searchResultCount = SearchAgent.indexesOf(string, _characterRowItem.otherCharacterName).length > 0 ? 1 : 0
+                            }
+                            SearchAgent.onCurrentSearchResultIndexChanged: () => {
+                                highlight = SearchAgent.currentSearchResultIndex >= 0
+                                _charactersListView.currentIndex = index
+                            }
+
+                            RowLayout {
+                                id: _characterRow
+
+                                width: parent.width-20
+                                spacing: 10
+
+                                Image {
+                                    Layout.preferredWidth: 24
+                                    Layout.preferredHeight: 24
+
+                                    source: Runtime.themedIcon("qrc:/icons/navigation/check.png")
+                                    opacity: _relationshipName.length > 0 ? 1 : 0.05
+                                }
+
+                                VclLabel {
+                                    text: _characterRowItem.thisCharacterName + ": "
+                                    color: _characterRowItem.foregroundColor
+                                }
+
+                                VclTextField {
+                                    id: _relationshipName
+
+                                    Layout.fillWidth: true
+
+                                    Material.background: _characterRowItem.backgroundColor
+                                    Material.foreground: _characterRowItem.foregroundColor
+
+                                    TabSequenceItem.manager: _characterListTabManager
+                                    TabSequenceItem.sequence: _characterRowItem.index
+
+                                    label: ""
+                                    color: _characterRowItem.foregroundColor
+                                    maximumLength: 50
+                                    placeholderText: "husband of, wife of, friends with, reports to ..."
+                                    enableTransliteration: true
+
+                                    onActiveFocusChanged: {
+                                        if(activeFocus)
+                                            _charactersListView.currentIndex = _characterRowItem.index
+                                    }
+                                }
+
+                                VclLabel {
+                                    text: SMath.titleCased(_characterRowItem.otherCharacterName) + "."
+                                    color: _characterRowItem.foregroundColor
+                                }
+                            }
+                        }
+
+                        function initializeCacheBuffer() {
+                            let firstDelegate = itemAtIndex(0)
+                            const heightEstimate = firstDelegate ? Math.ceil(firstDelegate.height*1.1) : 75
+                            cacheBuffer = heightEstimate * count
+                        }
+
+                        Component.onCompleted: Qt.callLater(initializeCacheBuffer)
+                    }
+                }
+
+                VclButton {
+                    Layout.alignment: Qt.AlignRight
+
+                    text: "Create Relationships"
+
+                    onClicked: _createRelationshipsJob.start()
+
+                    ActionHandler {
+                        action: _dialog.acceptAction
+
+                        onTriggered: parent.clicked()
+                    }
+                }
+            }
+
+            SequentialAnimation {
+                id: _createRelationshipsJob
+
+                running: false
+
+                ScriptAction {
+                    script: {
+                        _private.waitDialog = WaitDialog.launch("Creating relationships ...")
+                    }
+                }
+
+                PauseAnimation {
+                    duration: 200
+                }
+
+                ScriptAction {
+                    script: {
+                        let nrRelationshipsAdded = 0
+                        for(let i=0; i<_charactersListView.count; i++) {
+                            _charactersListView.positionViewAtIndex(i, ListView.Visible)
+                            let item = _charactersListView.itemAtIndex(i)
+                            if(item.checked) {
+                                let otherCharacter = Scrite.document.structure.addCharacter(item.otherCharacterName)
+                                if(otherCharacter) {
+                                    const rel = character.addRelationship(item.relationship, otherCharacter)
+                                    if(rel)
+                                        ++nrRelationshipsAdded
+                                }
+                            }
+                        }
+
+                        if(nrRelationshipsAdded > 0)
+                            character.characterRelationshipGraph = {}
+
+                        _private.waitDialog.close()
+                        _private.waitDialog = null
+
+                        Qt.callLater(_dialog.close)
+                    }
+                }
+            }
+
+            QtObject {
+                id: _private
+
+                property VclDialog waitDialog
+            }
+        }
+    }
+}

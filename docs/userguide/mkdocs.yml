@@ -1,0 +1,45 @@
+site_name: Scrite User Guide
+site_url: https://www.scrite.io/docs/userguide
+theme:
+  name: material
+  logo: images/scrite-appicon.png
+  font:
+    text: Rubik
+    code: Roboto Mono
+  palette: 
+    - scheme: default
+      primary: purple
+      accent: purple
+  features:
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+markdown_extensions:
+  - toc:
+      permalink: true
+      separator: '-'
+      toc_depth: 4
+plugins:
+  - mkdocs-video
+  - search:
+      lang: en
+      separator: '[\s\-.]+'
+# hooks:
+#   - hooks.py
+nav:
+  - index.md
+  - quickstart.md
+  - user-interface.md
+  - screenplay.md
+  - files.md
+  - languages.md
+  - scriptalay.md
+  - imports.md
+  - exports.md
+  - structure.md
+  - structure-advanced.md
+  - templates.md
+  - notebook.md
+  - reports.md
+  - user-account.md
+  - support.md

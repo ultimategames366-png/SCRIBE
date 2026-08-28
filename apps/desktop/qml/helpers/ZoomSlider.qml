@@ -1,0 +1,158 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+Item {
+    id: root
+
+    property alias to: _slider.to
+    property alias from: _slider.from
+    property alias value: _slider.value
+    property alias pressed: _slider.pressed
+    property alias stepSize: _slider.stepSize
+    property alias zoomLevel: _slider.zoomLevel
+    property alias zoomInTooltip: _zoomInButton.tooltipText
+    property alias zoomOutTooltip: _zoomOutButton.tooltipText
+
+    signal sliderMoved()
+    signal zoomInRequest()
+    signal zoomOutRequest()
+
+    function zoomIn() { _zoomInButton.clicked() }
+    function zoomOut() { _zoomOutButton.clicked() }
+
+    implicitWidth: _layout.width
+    implicitHeight: Runtime.idealFontMetrics.height + 8
+
+    RowLayout {
+        id: _layout
+
+        anchors.verticalCenter: parent.verticalCenter
+
+        IconButton {
+            id: _zoomOutButton
+
+            enabled: _slider.value > _slider.from
+            source: Runtime.themedIcon("qrc:/icons/navigation/zoom_out.png")
+            tooltipText: "Zoom Out"
+
+            onClicked: {
+                if(_slider.stepSize > 0)
+                    _slider.value = _slider.value-_slider.stepSize
+                else
+                    root.zoomOutRequest()
+            }
+        }
+
+        VclLabel {
+            Layout.preferredWidth: Runtime.minimumFontMetrics.advanceWidth("999%") + leftPadding + rightPadding
+
+            text: Math.round(_slider.zoomLevel * 100) + "%"
+            leftPadding: 5
+            rightPadding: 5
+            horizontalAlignment: Text.AlignRight
+
+            font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+
+                onClicked: _sliderPopup.open()
+            }
+
+            VclMenu {
+                id: _sliderPopup
+
+                VclMenuItem {
+                    height: 40
+                    background: Item { }
+                    contentItem: Slider {
+                        id: _slider
+
+                        property real zoomLevel: value
+
+                        to: 2
+                        from: 0.4
+                        value: 1
+                        padding: 0
+                        stepSize: 0.1
+                        orientation: Qt.Horizontal
+
+                        onMoved: root.sliderMoved()
+                    }
+                }
+            }
+        }
+
+        IconButton {
+            id: _zoomInButton
+
+            Layout.rightMargin: 10
+
+            source: Runtime.themedIcon("qrc:/icons/navigation/zoom_in.png")
+            enabled: _slider.value < _slider.to
+            tooltipText: "Zoom In"
+
+            onClicked: {
+                if(_slider.stepSize > 0)
+                    _slider.value = _slider.value+_slider.stepSize
+                else
+                    root.zoomInRequest()
+            }
+        }
+    }
+
+    component IconButton : Image {
+        id: _iconButton
+
+        property string tooltipText
+
+        signal clicked()
+
+        Layout.preferredWidth: Runtime.idealFontMetrics.height
+        Layout.preferredHeight: Runtime.idealFontMetrics.height
+
+        scale: _iconButtonMouseArea.containsMouse ? (_iconButtonMouseArea.pressed ? 1 : 1.5) : 1
+        mipmap: true
+
+        Behavior on scale { NumberAnimation { duration: Runtime.stdAnimationDuration } }
+
+        MouseArea {
+            id: _iconButtonMouseArea
+
+            anchors.fill: parent
+            hoverEnabled: true
+
+            ToolTipPopup {
+                container: _iconButtonMouseArea
+                text: _iconButton.tooltipText
+                visible: text !== "" && _iconButtonMouseArea.containsMouse
+            }
+
+            onClicked: parent.clicked()
+        }
+    }
+}

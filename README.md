@@ -1,0 +1,182 @@
+# Scrite
+
+Scrite is an open-source desktop screenwriting app. Its an offline app, with no built-in cloud
+syncing. You can find more information on our [official website](https://www.scrite.io).
+
+<img src="./apps/desktop/images/scrite_logo_for_report_header.png" alt="Scrite Logo" width="320"/>
+
+## Features
+- Create screenplays and format elements appropriately.
+- Type in multiple Indian and International languages.
+- Import screenplays from FinalDraft and HTML formats.
+- Export screenplays to PDF, FinalDraft, Text and HTML formats.
+- Generate Character and Location Reports
+- Capture character and scene notes.
+
+A complete user guide can be found [here](https://www.scrite.io/docs/userguide).
+
+<img src="./docs/screenshots/banner.jpeg" alt="Banner" width="720"/>
+
+## Building from source
+Scrite is developed using Qt 6.11. To build Scrite, install Qt 6.11+ on your computer (Windows,
+macOS, or Linux) and CMake 3.27+.
+
+Open the project in Qt Creator (it auto-detects CMakeLists.txt) and set the build configuration to
+**Release**, or build from the command line:
+
+```bash
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+Build artifacts are placed in the `binary/` directory.
+
+## Reporting Issues
+If you run into bugs, crashes or find missing features OR features that are not working as expected,
+we recommend that you post a message on our Discord server, discuss it with us there before creating
+a bug ticket on GitHub.
+
+Here is a link to our Discord server: https://discord.gg/bGHquFX5jK
+
+## Conference Talks based on Scrite
+These talks may help you find your way around the code.
+
+- Solving Problems for Yourself, and Accidentally Thousands More - [IndiaFOSS
+  2025](https://www.youtube.com/watch?v=2O9A4HRlJAY)
+- Closing The Gaps - QML on the Desktop - [Qt DevCon 2022](https://youtu.be/tyn90zQZTEg)
+- Building Beautiful Desktop Apps Using QML - [Qt DevDes Days 2021](https://youtu.be/zQAGs8cuGv8)
+- Insights from Building Scrite Using QML - [Qt Desktop Days 2020](https://youtu.be/z7GEUrRyh0U)
+
+## Tutorials and Walkthoughs
+
+- [Guided Tour of Scrite, Sep 2022](https://youtu.be/Web6WEj56wo)
+- [Generating the Statistics Report](https://youtu.be/qp8ZSYI8Z_w)
+- [Using Custom Story Beats](https://youtu.be/Ql_BjMVpjNc)
+- [Typing in Multiple Indian Languages](https://youtu.be/Ts1PFvemaIw)
+
+## Reviews
+
+- [ScreenwritingScribe reviews Scrite, Jan 2025](https://www.youtube.com/watch?v=8PXrQ6DUw9o)
+- [Sarvana from Film Psychology reviews Scrite, in
+  Tamil](https://www.youtube.com/watch?v=ipWjr_33iIk)
+- [Rahul, Pooja of Paramvah Studios talk about their Film and Scrite](https://youtu.be/niG2X6nCYCA)
+- [Nhân Trương reviews Scrite, in Vietnamese](https://www.youtube.com/watch?v=oY4kQrzIgvU)
+- [James K Martin reviews Scrite](https://www.youtube.com/watch?v=_JkTx75oVbE)
+
+## Special Thanks
+
+<a href="https://www.scrite.io/fossunited-grants/" target="_blank">
+<img src="./resources/sponsored-by-fugrants.png" alt="Sponsored by FOSSUnited" width="160"/>
+</a>
+
+[Grant Funding (2026)](https://www.scrite.io/fossunited-grants/): Covering essential expenses 
+related to server hosting, software licensing, code signing certificates, and legal document 
+reviews.
+
+## Dependencies
+
+### mkdocs
+If you want to generate documentation from the docs folder, you will also need to install Python and
+mkdocs.
+
+#### On macOS
+
+Most users prefer to install python from homebrew on macOS. In such cases, it works best if a
+separate environment is created for serving docs.
+
+    # Switch to docs/userguide
+    cd ./docs/userguide
+
+    # Fresh Homebrew Python (ensures pip works)
+    brew install python
+
+    # Project-specific virtualenv (isolates from system)
+    cd your-scrite-docs-folder
+    python3 -m venv venv
+    source venv/bin/activate
+
+    # Install MkDocs ecosystem
+    pip install mkdocs mkdocs-material mkdocs-video mkdocs-rss-plugin
+
+    # Serve docs
+    mkdocs serve --livereload
+
+    # Open http://127.0.0.1:8000 on your browser
+
+#### On Windows & Linux
+
+Once you have python and pip installed,
+
+    # Switch to docs/userguide
+    cd ./docs/userguide
+
+    # Install Mkdocs ecosystem
+    pip install mkdocs mkdocs-material mkdocs-video
+
+    # Serve docs
+    python -m mkdocs serve
+
+    # Open http://127.0.0.1:8000 on your browser
+
+Further reading: https://www.mkdocs.org/user-guide/installation/
+
+### Qt
+We use a commercial license of Qt 6.11 for all production and beta builds. You should be able to use
+any Qt 6.11+ release for building Scrite. The code is organized to work well with our webservices in
+production, so if you build from the source code here — it may not work with our production servers.
+You should be able to comment away all references to our webservices and construct a purely
+open-source build. At some point, we will introduce compile time config settings to make this easy.
+
+### Windows
+Ensure that you have OpenSSL 3 installed. We use Windows 11 for development, although the app also
+works on Windows 10. Earlier versions of Windows are not supported.
+
+### macOS
+Any version of macOS supported by Qt 6.11 should work. macOS builds are universal binaries (x86_64 +
+arm64).
+
+### Linux
+To build the app on Linux, there are a couple of dependencies to take care of first.
+
+#### Hunspell (for spellcheck)
+To build Scrite with Hunspell support on Linux, install hunspell-dev. On Ubuntu:
+
+    sudo apt-get install libhunspell-dev
+
+#### xcb and xinerama
+Make sure that you have cursor, xinerama installed
+
+    sudo apt install libxcb-cursor0 libxcb-xinerama0
+
+#### OpenSSL
+You will also need OpenSSL 3:
+
+    sudo apt install libssl-dev
+
+#### imagemagick
+For running the package scripts, you will need imagemagick and linuxdeployqt
+
+    sudo apt install imagemagick
+
+#### linuxdeployqt (for packaging)
+    wget -c https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+
+#### lib-ibus-1.0 for Language support
+Language support on Linux requirres IBUS.
+
+    sudo apt install ibus ibus-m17n libibus-1.0-dev
+
+Additionally, ensure that ibus daemon is running and that you setup languages using
+
+    ibus-setup
+
+You may also need to include the following lines into environment variables.
+
+    export GTK_IM_MODULE=ibus
+    export XMODIFIERS=@im=ibus
+    export QT_IM_MODULE=ibus
+    export XIM_PROGRAM="/usr/bin/ibus-daemon -drx"
+
+## Screenshots
+
+<img src="./docs/screenshots/preview.png" alt="Preview" width="720"/>

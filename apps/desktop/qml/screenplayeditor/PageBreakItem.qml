@@ -1,0 +1,99 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Qt.labs.qmlmodels
+import QtQuick.Shapes
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+Rectangle {
+    id: root
+
+    readonly property color defaultForeground: Runtime.colors.primary.c600.background
+    readonly property color defaultColor: fullSize ? Runtime.colors.primary.c100.background : Runtime.colors.primary.c50.background
+
+    property int placement: Qt.TopEdge // or Qt.BottomEdge
+    property bool fullSize: true
+    property real textFontSize: Math.max(Runtime.sceneEditorFontMetrics.font.pointSize*0.7, 6)
+    property color foreground: defaultForeground
+
+    implicitWidth: 100
+    implicitHeight: _loader.height * (fullSize ? 1.2 : 1.1)
+
+    color: defaultColor
+
+    Loader {
+        id: _loader
+
+        y: root.placement === Qt.TopEdge ? (root.height-height) : 0
+        width: parent.width
+
+        sourceComponent: root.fullSize ? _fullSizeVariant : _miniSizeVariant
+    }
+
+    Component {
+        id: _fullSizeVariant
+
+        RowLayout {
+            DashedLine {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            VclLabel {
+                text: "Page Break"
+                font.pointSize: root.textFontSize
+                padding: root.fullSize ? 5 : 2
+                color: root.foreground
+            }
+
+            DashedLine {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignHCenter
+            }
+        }
+    }
+
+    Component {
+        id: _miniSizeVariant
+
+        DashedLine {
+            height: 8
+        }
+    }
+
+    component DashedLine : Shape {
+        id: _dashedLine
+
+        implicitHeight: 2
+
+        ShapePath {
+            strokeColor: root.foreground
+            strokeWidth: 1
+            strokeStyle: ShapePath.DashLine
+            dashPattern: [3,5]
+            startX: 0; startY: _dashedLine.height/2
+            PathLine { x: _dashedLine.width; y: _dashedLine.height/2 }
+        }
+    }
+}

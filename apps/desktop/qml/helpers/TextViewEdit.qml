@@ -1,0 +1,278 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+Loader {
+    id: root
+
+    property var completionStrings: []
+
+    property int elide: Text.ElideNone
+    property int wrapMode: Text.WordWrap
+    property int verticalAlignment: Text.AlignTop
+    property int horizontalAlignment: Text.AlignHCenter
+    property int searchSequenceNumber: -1
+
+    property bool readOnly: true
+    property bool hasFocus: item ? item.activeFocus : false
+    property bool frameVisible: false
+    property bool undoRedoEnabled: true
+
+    property real topPadding: 0
+    property real leftPadding: 0
+    property real contentWidth: item ? item.contentWidth : _private.fontMetrics.advanceWidth(text)
+    property real rightPadding: 0
+    property real bottomPadding: 0
+
+    property color textColor: "black"
+
+    property alias font: _private.fontMetrics.font
+    property alias fontHeight: _private.fontMetrics.height
+    property alias fontAscent: _private.fontMetrics.ascent
+    property alias fontDescent: _private.fontMetrics.descent
+
+    property string text
+
+    property SearchEngine searchEngine
+
+    signal textChangedDuringEdit(string text)
+    signal editingFinished()
+    signal highlightRequest()
+
+    sourceComponent: visible ? (readOnly ? _private.textViewComponent : _private.textEditComponent) : null
+
+    QtObject {
+        id: _private
+
+        readonly property FontMetrics fontMetrics: FontMetrics { }
+
+        readonly property Component textViewComponent: VclLabel {
+            readonly property bool editorKind: false
+
+            property var searchResults: []
+            property string markupText
+
+            SearchAgent.engine: root.searchEngine
+            SearchAgent.sequenceNumber: root.searchSequenceNumber
+            SearchAgent.searchResultCount: searchResults.length
+
+            SearchAgent.onSearchRequest: (string) => { root.searchResults = SearchAgent.indexesOf(string, text) }
+            SearchAgent.onClearHighlight: markupText = ""
+            SearchAgent.onClearSearchRequest: searchResults = []
+            SearchAgent.onCurrentSearchResultIndexChanged: {
+                if(SearchAgent.currentSearchResultIndex < 0)
+                    return
+                var result = searchResults[SearchAgent.currentSearchResultIndex]
+                markupText = SearchAgent.createMarkupText(root.text, result.from, result.to, Runtime.colors.palette.highlight, Runtime.colors.palette.highlightedText)
+                root.highlightRequest()
+            }
+
+            text: markupText !== "" ? markupText : root.text
+            font: root.font
+            elide: root.elide
+            color: root.textColor
+            wrapMode: root.wrapMode
+            textFormat: markupText === "" ? Text.PlainText : Text.RichText
+            verticalAlignment: root.verticalAlignment
+            horizontalAlignment: root.horizontalAlignment
+
+            topPadding: root.topPadding
+            leftPadding: root.leftPadding
+            rightPadding: root.rightPadding
+            bottomPadding: root.bottomPadding
+        }
+
+        readonly property Component textEditComponent: TextArea {
+            id: _textArea
+
+            readonly property bool editorKind: true
+
+            Component.onCompleted: {
+                selectAll()
+                forceActiveFocus()
+            }
+
+            Component.onDestruction: {
+                root.text = text
+                root.editingFinished()
+            }
+
+
+            Keys.onEscapePressed: {
+                editingFinished()
+            }
+
+            Keys.onReturnPressed: (event) => {
+                if(_completionModel.hasSuggestion) {
+                    _textArea.text = _completionModel.suggestion
+                    _textArea.cursorPosition = _textArea.length
+                    _completionModel.allowEnable = false
+                } else if(event.modifiers !== Qt.NoModifier)
+                    _textArea.append("\n")
+                else
+                    editingFinished()
+            }
+
+            SyntaxHighlighter.textDocument: textDocument
+            SyntaxHighlighter.textDocumentUndoRedoEnabled: root.undoRedoEnabled
+            SyntaxHighlighter.delegates: [
+                LanguageFontSyntaxHighlighterDelegate {
+                    enabled: Runtime.screenplayEditorSettings.useLanguageFonts
+                    defaultFont: _textArea.font
+                }
+            ]
+
+            PlaceholderVisibility.visible: !activeFocus && text === ""
+
+            LanguageTransliterator.popup: LanguageTransliteratorPopup {
+                editorFont: _textArea.font
+            }
+            LanguageTransliterator.option: Runtime.language.activeTransliterationOption
+            LanguageTransliterator.enabled: !readOnly
+
+            text: root.text
+            font: root.font
+            // palette: Runtime.colors.palette
+            opacity: activeFocus ? 1 : 0.5
+            wrapMode: root.wrapMode
+            selectByMouse: true
+            selectByKeyboard: true
+            verticalAlignment: root.verticalAlignment
+            horizontalAlignment: root.horizontalAlignment
+
+            topPadding: root.topPadding
+            leftPadding: root.leftPadding
+            rightPadding: root.rightPadding
+            bottomPadding: root.bottomPadding
+
+            background: Rectangle {
+                visible: root.frameVisible
+                border.width: 1
+                border.color: Runtime.colors.primary.borderColor
+            }
+
+            ActionHandler {
+                action: ActionHub.editOptions.find("undo")
+                enabled: !_textArea.readOnly && _textArea.activeFocus && root.undoRedoEnabled && _textArea.canUndo
+
+                onTriggered: () => { _textArea.undo() }
+            }
+
+            ActionHandler {
+                action: ActionHub.editOptions.find("redo")
+                enabled: !_textArea.readOnly && _textArea.activeFocus && root.undoRedoEnabled && _textArea.canRedo
+
+                onTriggered: () => { _textArea.redo() }
+            }
+
+            CompletionModel {
+                id: _completionModel
+
+                property bool hasItems: count > 0
+                property bool allowEnable: true
+                property bool hasSuggestion: count > 0
+
+                property string suggestion: currentCompletion
+
+                enabled: allowEnable && _textArea.activeFocus
+                strings: root.completionStrings
+                sortStrings: false
+                completionPrefix: _textArea.text
+                filterKeyStrokes: _textArea.activeFocus
+
+                onRequestCompletion: {
+                    _textArea.text = currentCompletion
+                    _textArea.cursorPosition = _textArea.length
+                    allowEnable = false
+                }
+
+                onHasItemsChanged: {
+                    if(hasItems)
+                        _completionViewPopup.open()
+                    else
+                        _completionViewPopup.close()
+                }
+            }
+
+            Popup {
+                id: _completionViewPopup
+
+                Material.elevation: 6
+                Material.containerStyle: Material.Filled
+                Material.roundedScale: Material.NotRounded
+
+                x: _textArea.cursorRectangle.x - GMath.boundingRect(_completionModel.completionPrefix, parent.font).width
+                y: _textArea.cursorRectangle.y + _textArea.cursorRectangle.height
+                width: GMath.largestBoundingRect(_completionModel.strings, _textArea.font).width + leftInset + rightInset + leftPadding + rightPadding + 20
+                height: _completionView.contentHeight + topInset + bottomInset + topPadding + bottomPadding
+
+                focus: false
+                closePolicy: Popup.NoAutoClose
+
+                contentItem: ListView {
+                    id: _completionView
+
+                    FlickScrollSpeedControl.factor: Runtime.workspaceSettings.flickScrollSpeedFactor
+
+                    height: contentHeight
+
+                    model: _completionModel
+                    currentIndex: _completionModel.currentRow
+                    keyNavigationEnabled: false
+
+                    delegate: VclLabel {
+                        id: _completionDelegate
+
+                        required property int index
+                        required property string completionString
+
+                        width: _completionView.width-1
+
+                        text: completionString
+                        font: _textArea.font
+                        color: index === _completionView.currentIndex ? Runtime.colors.primary.highlight.text : Runtime.colors.primary.c10.text
+                        padding: 5
+                    }
+
+                    highlight: Rectangle {
+                        color: Runtime.colors.primary.highlight.background
+                    }
+                }
+            }
+
+            onTextEdited: {
+                root.textChangedDuringEdit(text);
+                _completionModel.allowEnable = true
+            }
+
+            onFocusChanged: _completionModel.allowEnable = true
+
+            onEditingFinished: {
+                root.text = text
+                root.editingFinished()
+            }
+        }
+    }
+}

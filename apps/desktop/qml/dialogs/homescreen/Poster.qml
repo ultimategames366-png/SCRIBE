@@ -1,0 +1,160 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../../globals"
+import "../../controls"
+import "../../helpers"
+
+Item {
+    id: root
+
+    property alias source: _private.posterSource // can be a string path, url or QImage
+    property string logline
+
+    visible: _private.hasPoster
+
+    // Background
+    Item {
+        anchors.fill: parent
+
+        Image {
+            id: _posterImageBg
+
+            anchors.fill: parent
+
+            cache: false
+            visible: _private.posterSourceKind === _private.e_ImageKind
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+
+            source: visible ? _private.posterSourceUrl : ""
+        }
+
+        QImageItem {
+            anchors.fill: parent
+
+            visible: _private.posterSourceKind === _private.e_QImageKind
+            fillMode: QImageItem.PreserveAspectCrop
+            useSoftwareRenderer: Runtime.currentUseSoftwareRenderer
+
+            image: visible ? _private.posterQImage : Gui.emptyQImage
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: "black"
+            opacity: 0.75
+        }
+
+        BusyIndicator {
+            anchors.centerIn: parent
+
+            Material.theme: Material.Dark
+
+            running: _posterImageBg.status === Image.Loading || _posterImageFg.status === Image.Loading
+        }
+    }
+
+    // Foreground
+    Item {
+        anchors.fill: parent
+
+        Image {
+            id: _posterImageFg
+
+            anchors.fill: parent
+
+            cache: false
+            visible: _private.posterSourceKind === _private.e_ImageKind
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+
+            source: visible ? _private.posterSourceUrl : ""
+        }
+
+        QImageItem {
+            anchors.fill: parent
+
+            visible: _private.posterSourceKind === _private.e_QImageKind
+            fillMode: QImageItem.PreserveAspectFit
+            useSoftwareRenderer: Runtime.currentUseSoftwareRenderer
+
+            image: visible ? _private.posterQImage : Gui.emptyQImage
+        }
+    }
+
+    VclLabel {
+        width: parent.width * 0.75
+
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 20
+        anchors.bottomMargin: 20
+
+        color: "white"
+        visible: text !== ""
+        background: Rectangle {
+            color: "black"
+            opacity: 0.8
+            radius: 5
+        }
+
+        elide: Text.ElideRight
+        padding: 10
+        wrapMode: Text.WordWrap
+        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+        maximumLineCount: 4
+        verticalAlignment: Text.AlignBottom
+        horizontalAlignment: Text.AlignLeft
+
+        text: root.logline
+    }
+
+    // Private stuff
+    QtObject {
+        id: _private
+
+        property string posterSourceUrl
+        property image posterQImage: Gui.emptyQImage
+        property var posterSource
+        property bool hasPoster: false
+
+        readonly property int e_ImageKind: 0
+        readonly property int e_QImageKind: 1
+        property int posterSourceKind: e_ImageKind
+
+        onPosterSourceChanged: {
+            posterSourceUrl = ""
+            posterQImage = Gui.emptyQImage
+            hasPoster = false
+
+            if(typeof posterSource === "string" || typeof posterSource === "url") {
+                posterSourceUrl = posterSource
+                posterSourceKind = e_ImageKind
+                hasPoster = posterSourceUrl !== ""
+            } else if(typeof posterSource === "object" && Object.isOfType(posterSource, "QImage")) {
+                posterQImage = posterSource
+                posterSourceKind = e_QImageKind
+                hasPoster = true
+            }
+        }
+    }
+}

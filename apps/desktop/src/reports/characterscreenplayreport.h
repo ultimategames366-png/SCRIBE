@@ -1,0 +1,81 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+#ifndef CHARACTERSCREENPLAYREPORT_H
+#define CHARACTERSCREENPLAYREPORT_H
+
+#include "abstractscreenplaysubsetreport.h"
+
+class CharacterScreenplayReport : public AbstractScreenplaySubsetReport
+{
+    Q_OBJECT
+    // clang-format off
+    Q_CLASSINFO("Title", "Character Screenplay")
+    Q_CLASSINFO( "Description", "Generate screenplay with only those scenes where one or more characters are present.")
+    Q_CLASSINFO("Icon", ":/icons/reports/character_screenplay.png")
+    // clang-format on
+
+public:
+    Q_INVOKABLE explicit CharacterScreenplayReport(QObject *parent = nullptr);
+    ~CharacterScreenplayReport();
+
+    // clang-format off
+    Q_CLASSINFO("highlightDialogues_FieldGroup", "Characters")
+    Q_CLASSINFO("highlightDialogues_FieldLabel", "Highlight dialogues in yellow background")
+    Q_CLASSINFO("highlightDialogues_FieldEditor", "CheckBox")
+    Q_PROPERTY(bool highlightDialogues
+               READ isHighlightDialogues
+               WRITE setHighlightDialogues
+               NOTIFY highlightDialoguesChanged)
+    // clang-format on
+    void setHighlightDialogues(bool val);
+    bool isHighlightDialogues() const { return m_highlightDialogues; }
+    Q_SIGNAL void highlightDialoguesChanged();
+
+    // clang-format off
+    Q_CLASSINFO("characterNames_FieldGroup", "Characters")
+    Q_CLASSINFO("characterNames_FieldLabel", "Characters to include in the report")
+    Q_CLASSINFO("characterNames_FieldEditor", "MultipleCharacterNameSelector")
+    Q_CLASSINFO("characterNames_IsPersistent", "false")
+    Q_PROPERTY(QStringList characterNames
+               READ characterNames
+               WRITE setCharacterNames
+               NOTIFY characterNamesChanged)
+    // clang-format on
+    void setCharacterNames(const QStringList &val);
+    QStringList characterNames() const { return m_characterNames; }
+    Q_SIGNAL void characterNamesChanged();
+
+protected:
+    // AbstractReportGenerator interface
+    QString personalizedFileName(const QString &fileName) const override;
+
+    // AbstractScreenplaySubsetReport interface
+    bool includeScreenplayElement(const ScreenplayElement *) const;
+    QString screenplaySubtitle() const;
+    void configureScreenplayTextDocument(ScreenplayTextDocument &stDoc);
+
+private:
+    QString m_comment;
+    QString m_watermark;
+    bool m_includeNotes = false;
+    QStringList m_characterNames;
+    bool m_includeSceneIcons = true;
+    bool m_highlightDialogues = true;
+    bool m_includeSceneNumbers = true;
+    bool m_printEachSceneOnANewPage = false;
+};
+
+#endif // CHARACTERSCREENPLAYREPORT_H

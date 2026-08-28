@@ -1,0 +1,65 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+
+import "../../../../helpers"
+import "../../../../globals"
+import "../../../../controls"
+import "../../../../structureview"
+import "../../.."
+
+SpellingSuggestionsMenu {
+    id: root
+
+    required property TextEdit sceneTextEditor
+    required property SceneDocumentBinder sceneDocumentBinder
+
+    spellingSuggestions: sceneDocumentBinder.spellingSuggestions
+
+    onReplaceRequest: (suggestion) => {
+                          if(__cursorPosition >= 0) {
+                              sceneDocumentBinder.replaceWordAt(__cursorPosition, suggestion)
+                              sceneTextEditor.cursorPosition = __cursorPosition
+                          }
+                      }
+
+    onMenuAboutToShow: () => {
+                           __cursorPosition = sceneTextEditor.cursorPosition
+                           sceneTextEditor.persistentSelection = true
+                       }
+
+    onMenuAboutToHide: () => {
+                           sceneTextEditor.persistentSelection = false
+                           sceneTextEditor.forceActiveFocus()
+                           sceneTextEditor.cursorPosition = __cursorPosition
+                       }
+
+    onAddToDictionaryRequest: () => {
+                                  sceneDocumentBinder.addWordUnderCursorToDictionary()
+                              }
+
+    onAddToIgnoreListRequest: () => {
+                                  sceneDocumentBinder.addWordUnderCursorToIgnoreList()
+                              }
+
+    property int __cursorPosition: -1
+}

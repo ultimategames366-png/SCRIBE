@@ -1,0 +1,1078 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+#ifndef LANGUAGEENGINE_H
+#define LANGUAGEENGINE_H
+
+#include <QFont>
+#include <QObject>
+#include <QQuickItem>
+#include <QQmlEngine>
+#include <QTextLayout>
+#include <QKeySequence>
+#include <QNetworkReply>
+#include <QFontDatabase>
+#include <QAbstractListModel>
+#include <QQuickImageProvider>
+
+class QTextCursor;
+class LanguageEngine;
+class AbstractTransliterationEngine;
+
+struct TransliterationOption
+{
+    Q_GADGET
+    QML_VALUE_TYPE(scriteTransliterationOption)
+
+public:
+    // clang-format off
+    Q_PROPERTY(QObject *transliterator
+               MEMBER transliteratorObject)
+    // clang-format on
+    QPointer<QObject> transliteratorObject; // must be of type AbstractTransliterationEngine
+
+    // clang-format off
+    Q_PROPERTY(int languageCode
+               MEMBER languageCode)
+    // clang-format on
+    int languageCode = -1;
+
+    // clang-format off
+    Q_PROPERTY(QString id
+               MEMBER id)
+    // clang-format on
+    QString id;
+
+    // clang-format off
+    Q_PROPERTY(QString name
+               MEMBER name)
+    // clang-format on
+    QString name;
+
+    // This should be set to true if the app needs to show a popup to display
+    // transliteration, and if transliterateWord() will accept an English text
+    // to return transliterated text in another language.
+    // This should be set to false, unless there is a transliteration engine that's
+    // statically linked to the Scrite code, which is the case for platform/OS
+    // input methods.
+    // clang-format off
+    Q_PROPERTY(bool inApp
+               MEMBER inApp)
+    // clang-format on
+    bool inApp = false;
+
+    // clang-format off
+    Q_PROPERTY(bool valid
+               READ isValid)
+    // clang-format on
+    bool isValid() const;
+
+    // clang-format off
+    Q_PROPERTY(bool hasAlphabetMappings
+               READ hasAlphabetMappings)
+    // clang-format on
+    bool hasAlphabetMappings() const;
+
+    Q_INVOKABLE bool activate();
+    Q_INVOKABLE QString transliterateWord(const QString &word) const;
+    Q_INVOKABLE QString transliterateParagraph(const QString &paragraph) const;
+
+    AbstractTransliterationEngine *transliterator() const;
+
+    TransliterationOption() { }
+    TransliterationOption(QObject *_transliteratorObject, int _languageCode, const QString &_id,
+                          const QString &_name, bool _inApp)
+        : transliteratorObject(_transliteratorObject),
+          languageCode(_languageCode),
+          id(_id),
+          name(_name),
+          inApp(_inApp)
+    {
+    }
+    TransliterationOption(const TransliterationOption &other) { *this = other; }
+    ~TransliterationOption() { }
+    TransliterationOption &operator=(const TransliterationOption &other)
+    {
+        this->transliteratorObject = other.transliteratorObject;
+        this->languageCode = other.languageCode;
+        this->id = other.id;
+        this->name = other.name;
+        this->inApp = other.inApp;
+        return *this;
+    }
+    bool operator==(const TransliterationOption &other) const
+    {
+        return languageCode == other.languageCode && id == other.id && name == other.name
+                && inApp == other.inApp;
+    }
+    bool operator!=(const TransliterationOption &other) const { return !(*this == other); }
+};
+Q_DECLARE_METATYPE(TransliterationOption)
+Q_DECLARE_METATYPE(QList<TransliterationOption>)
+
+struct Language
+{
+    Q_GADGET
+    QML_VALUE_TYPE(scriteLanguage)
+
+public:
+    // clang-format off
+    Q_PROPERTY(int code
+               MEMBER code)
+    // clang-format on
+    int code = -1;
+
+    // clang-format off
+    Q_PROPERTY(QString name
+               READ name)
+    // clang-format on
+    QString name() const;
+
+    // clang-format off
+    Q_PROPERTY(QString nativeName
+               READ nativeName)
+    // clang-format on
+    QString nativeName() const;
+
+    // clang-format off
+    Q_PROPERTY(QString shortName
+               READ shortName)
+    // clang-format on
+    QString shortName() const;
+
+    // clang-format off
+    Q_PROPERTY(QString glyph
+               READ glyph)
+    // clang-format on
+    QString glyph() const;
+
+    // clang-format off
+    Q_PROPERTY(QUrl iconSource
+               READ iconSource)
+    // clang-format on
+    QUrl iconSource() const;
+
+    // clang-format off
+    Q_PROPERTY(QKeySequence keySequence
+               MEMBER keySequence)
+    // clang-format on
+    QKeySequence keySequence;
+
+    // clang-format off
+    Q_PROPERTY(QString preferredTransliterationOptionId
+               MEMBER preferredTransliterationOptionId)
+    // clang-format on
+    QString preferredTransliterationOptionId;
+
+    // clang-format off
+    Q_PROPERTY(bool valid
+               READ isValid)
+    // clang-format on
+    bool isValid() const { return code >= 0; }
+
+    Q_INVOKABLE int charScript() const; // Returns QtChar::Script
+    Q_INVOKABLE int localeScript() const; // Returns QLocale::Script
+    Q_INVOKABLE int fontWritingSystem() const; // Returns QFontDatabase::WritingSystem
+    Q_INVOKABLE bool activate();
+    Q_INVOKABLE QString charScriptName() const;
+    Q_INVOKABLE QString localeScriptName() const;
+    Q_INVOKABLE QString fontWritingSystemName() const;
+    Q_INVOKABLE QFont font() const;
+    Q_INVOKABLE QString shortcut() const { return keySequence.toString(); }
+    Q_INVOKABLE QStringList fontFamilies() const;
+    Q_INVOKABLE TransliterationOption preferredTransliterationOption() const;
+    Q_INVOKABLE QList<TransliterationOption> transliterationOptions() const;
+
+    Language() { }
+    Language(int _code, const QKeySequence &_keySequence,
+             const QString &_preferredTransliterationOptionId)
+        : code(_code),
+          keySequence(_keySequence),
+          preferredTransliterationOptionId(_preferredTransliterationOptionId)
+    {
+    }
+    Language(const Language &other) { *this = other; }
+    ~Language() { }
+    Language &operator=(const Language &other)
+    {
+        this->code = other.code;
+        this->keySequence = other.keySequence;
+        this->preferredTransliterationOptionId = other.preferredTransliterationOptionId;
+        return *this;
+    }
+    bool operator==(const Language &other) const
+    {
+        return code == other.code && keySequence == other.keySequence
+                && preferredTransliterationOptionId == other.preferredTransliterationOptionId;
+    }
+    bool operator!=(const Language &other) const { return !(*this == other); }
+
+    static QChar::Script scriptForLanguage(QLocale::Language language,
+                                           QChar::Script defaultScript = QChar::Script_Latin);
+};
+Q_DECLARE_METATYPE(Language)
+
+class AbstractLanguagesModel : public QAbstractListModel
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Instantiation from QML not allowed.")
+
+public:
+    ~AbstractLanguagesModel();
+
+    Q_INVOKABLE int indexOfLanguage(int code) const;
+    Q_INVOKABLE bool hasLanguage(int code) const; // here code should be from QLocale::Language
+    Q_INVOKABLE Language findLanguage(int code) const;
+    Q_INVOKABLE Language languageAt(int index) const;
+
+    // clang-format off
+    Q_PROPERTY(QList<int> languageCodes
+               READ languageCodes
+               NOTIFY languagesCodesChanged)
+    // clang-format on
+    QList<int> languageCodes() const { return m_languageCodes; }
+
+    // clang-format off
+    Q_PROPERTY(int count
+               READ count
+               NOTIFY countChanged)
+    // clang-format on
+    int count() const { return m_languages.size(); }
+    Q_SIGNAL void countChanged();
+
+    enum {
+        LanguageRole = Qt::UserRole,
+        CodeRole,
+        NameRole,
+        NativeNameRole,
+        KeySequenceRole,
+        PreferredTransliterationOptionIdRole
+    };
+    QHash<int, QByteArray> roleNames() const;
+    QVariant data(const QModelIndex &index, int role) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const;
+
+signals:
+    void languagesCodesChanged(const QList<int> &languageCodes);
+
+protected:
+    explicit AbstractLanguagesModel(QObject *parent = nullptr);
+
+    int addLanguage(const Language &language);
+    int removeLanguage(const Language &language);
+    int removeLanguageAt(int row);
+    int updateLanguage(const Language &language);
+    void setLanguages(const QList<Language> &languages);
+    const QList<Language> &languages() const { return m_languages; }
+
+    virtual void initialize();
+    virtual QJsonValue toJson() const;
+    virtual void fromJson(const QJsonValue &value);
+
+private:
+    void updateLanguageCodes();
+
+    friend class LanguageEngine;
+
+    QList<Language> m_languages;
+    QList<int> m_languageCodes; // each int is a QLocale::Language value
+};
+
+class SupportedLanguages : public AbstractLanguagesModel
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Instantiation from QML not allowed.")
+
+public:
+    ~SupportedLanguages();
+
+    // clang-format off
+    Q_PROPERTY(int activeLanguageCode
+               READ activeLanguageCode
+               WRITE setActiveLanguageCode
+               NOTIFY activeLanguageCodeChanged)
+    // clang-format on
+    void setActiveLanguageCode(int val);
+    int activeLanguageCode() const { return m_activeLanguageCode; }
+    Q_SIGNAL void activeLanguageCodeChanged();
+
+    // clang-format off
+    Q_PROPERTY(int defaultLanguageCode
+               READ defaultLanguageCode
+               WRITE setDefaultLanguageCode
+               NOTIFY defaultLanguageCodeChanged)
+    // clang-format on
+    void setDefaultLanguageCode(int val);
+    int defaultLanguageCode() const { return m_defaultLanguageCode; }
+    Q_SIGNAL void defaultLanguageCodeChanged();
+
+    // clang-format off
+    Q_PROPERTY(Language activeLanguage
+               READ activeLanguage
+               NOTIFY activeLanguageCodeChanged)
+    // clang-format on
+    Language activeLanguage() const;
+
+    // clang-format off
+    Q_PROPERTY(Language defaultLanguage
+               READ defaultLanguage
+               NOTIFY defaultLanguageCodeChanged)
+    // clang-format on
+    Language defaultLanguage() const;
+
+    // clang-format off
+    Q_PROPERTY(int activeLanguageRow
+               READ activeLanguageRow
+               NOTIFY activeLanguageRowChanged)
+    // clang-format on
+    int activeLanguageRow() const;
+    Q_SIGNAL void activeLanguageRowChanged();
+
+    Q_INVOKABLE int addLanguage(int code);
+    Q_INVOKABLE int removeLanguage(int code);
+    Q_INVOKABLE int updateLanguage(int code);
+
+    Q_INVOKABLE bool assignLanguageShortcut(int code, const QString &nativeSequence);
+    Q_INVOKABLE bool assignLanguageFontFamily(int code, const QString &fontFamily); // Helper
+    Q_INVOKABLE bool useLanguageTransliterator(int code, const TransliterationOption &option);
+    Q_INVOKABLE bool useLanguageTransliteratorId(int code, const QString &id);
+    Q_INVOKABLE bool resetLanguageTranslator(int code);
+
+signals:
+    void languageShortcutChanged(int code);
+    void languageTransliteratorChanged(int code);
+
+protected:
+    bool eventFilter(QObject *object, QEvent *event);
+
+private:
+    explicit SupportedLanguages(QObject *parent = nullptr);
+
+    void loadBuiltInLanguages();
+    void reviewLoadBuiltInLanguages();
+    void transliterationOptionsUpdated();
+    void onScriptFontFamilyChanged(QChar::Script script, const QString &fontFamily);
+
+    void initialize();
+    QJsonValue toJson() const;
+    void fromJson(const QJsonValue &value);
+
+    void onDataChanged(const QModelIndex &start, const QModelIndex &end);
+    void verifyActiveLanguage();
+    void ensureActiveLanguage();
+
+private:
+    friend class LanguageEngine;
+    int m_activeLanguageCode = -1;
+    int m_defaultLanguageCode = -1;
+    bool m_loadedBuiltInLanguages = false;
+};
+
+class AvailableLanguages : public AbstractLanguagesModel
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Instantiation from QML not allowed.")
+
+public:
+    ~AvailableLanguages();
+
+private:
+    explicit AvailableLanguages(QObject *parent = nullptr);
+
+    void initialize();
+
+    friend class LanguageEngine;
+};
+
+/*
+Helpers for using the static transliterator only.
+*/
+struct AlphabetMapping
+{
+    Q_GADGET
+    QML_VALUE_TYPE(scriteAlphabetMapping)
+
+public:
+    // clang-format off
+    Q_PROPERTY(QString latin
+               MEMBER latin)
+    // clang-format on
+    QString latin;
+
+    // clang-format off
+    Q_PROPERTY(QString unicode
+               MEMBER unicode)
+    // clang-format on
+    QString unicode;
+
+    AlphabetMapping() { }
+    AlphabetMapping(const QString &_latin, const QString &_unicode)
+        : latin(_latin), unicode(_unicode)
+    {
+    }
+    AlphabetMapping(const AlphabetMapping &other) { *this = other; }
+    ~AlphabetMapping() { }
+    AlphabetMapping &operator=(const AlphabetMapping &other)
+    {
+        this->latin = other.latin;
+        this->unicode = other.unicode;
+        return *this;
+    }
+    bool operator==(const AlphabetMapping &other) const
+    {
+        return latin == other.latin && unicode == other.unicode;
+    }
+    bool operator!=(const AlphabetMapping &other) const { return !(*this == other); }
+};
+Q_DECLARE_METATYPE(AlphabetMapping)
+Q_DECLARE_METATYPE(QList<AlphabetMapping>)
+
+struct AlphabetMappings
+{
+    Q_GADGET
+    QML_VALUE_TYPE(scriteAlphabetMappings)
+
+public:
+    // clang-format off
+    Q_PROPERTY(bool valid
+               READ isValid)
+    // clang-format on
+    bool isValid() const
+    {
+        return language.isValid() && !consonants.isEmpty() && !digits.isEmpty()
+                && !symbols.isEmpty() && !vowels.isEmpty();
+    }
+
+    // clang-format off
+    Q_PROPERTY(Language language
+               MEMBER language)
+    // clang-format on
+    Language language;
+
+    // clang-format off
+    Q_PROPERTY(QList<AlphabetMapping> consonants
+               MEMBER consonants)
+    // clang-format on
+    QList<AlphabetMapping> consonants;
+
+    // clang-format off
+    Q_PROPERTY(QList<AlphabetMapping> digits
+               MEMBER digits)
+    // clang-format on
+    QList<AlphabetMapping> digits;
+
+    // clang-format off
+    Q_PROPERTY(QList<AlphabetMapping> symbols
+               MEMBER symbols)
+    // clang-format on
+    QList<AlphabetMapping> symbols;
+
+    // clang-format off
+    Q_PROPERTY(QList<AlphabetMapping> vowels
+               MEMBER vowels)
+    // clang-format on
+    QList<AlphabetMapping> vowels;
+
+    AlphabetMappings() { }
+    AlphabetMappings(const AlphabetMappings &other) { *this = other; }
+    ~AlphabetMappings() { }
+    AlphabetMappings &operator=(const AlphabetMappings &other)
+    {
+        this->language = other.language;
+        this->consonants = other.consonants;
+        this->digits = other.digits;
+        this->symbols = other.symbols;
+        this->vowels = other.vowels;
+        return *this;
+    }
+    bool operator==(const AlphabetMappings &other) const
+    {
+        return language == other.language && consonants == other.consonants
+                && digits == other.digits && symbols == other.symbols && vowels == other.vowels;
+    }
+    bool operator!=(const AlphabetMappings &other) const { return !(*this == other); }
+};
+Q_DECLARE_METATYPE(AlphabetMappings)
+
+class DefaultTransliteration : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+
+public:
+    explicit DefaultTransliteration(QObject *parent = nullptr);
+    ~DefaultTransliteration();
+
+    // clang-format off
+    Q_PROPERTY(QString driver
+               READ driver
+               CONSTANT )
+    // clang-format on
+    static QString driver();
+
+    // clang-format off
+    Q_PROPERTY(QList<int> supportedLanguageCodes
+               READ supportedLanguageCodes
+               CONSTANT )
+    // clang-format on
+    static QList<int> supportedLanguageCodes();
+
+    Q_INVOKABLE bool supportsLanguageCode(int code) const;
+
+    Q_INVOKABLE static QString onWord(const QString &word, int code);
+    Q_INVOKABLE static QString onParagraph(const QString &paragraph, int code);
+
+    Q_INVOKABLE static AlphabetMappings alphabetMappingsFor(int languageCode);
+
+    static QString shortcut(int languageCode);
+};
+
+class AbstractTransliterationEngine : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Instantiation from QML not allowed.")
+
+public:
+    explicit AbstractTransliterationEngine(QObject *parent = nullptr);
+    ~AbstractTransliterationEngine();
+
+    /** Returns the default language supported by this engine */
+    // clang-format off
+    Q_PROPERTY(int defaultLanguage
+               READ defaultLanguage
+               NOTIFY defaultLanguageChanged)
+    // clang-format on
+    virtual int defaultLanguage() const { return QLocale::English; }
+    Q_SIGNAL void defaultLanguageChanged();
+
+    /* Unique name among all transliterators supported */
+    // clang-format off
+    Q_PROPERTY(QString name
+               READ name
+               CONSTANT )
+    // clang-format on
+    virtual QString name() const = 0;
+
+    /** should return true if it supports transliteration to the said language */
+    virtual bool canTransliterate(int lang) const { return !this->options(lang).isEmpty(); }
+
+    /** should return a list of transliteration options */
+    virtual QList<TransliterationOption> options(int lang) const = 0;
+
+    bool doActivate(const TransliterationOption &option);
+
+    /** called to verify if an option is still available */
+    virtual bool canActivate(const TransliterationOption &option) = 0;
+
+    /** called to fetch the transliterated word for the said language **/
+    virtual QString transliterateWord(const QString &word,
+                                      const TransliterationOption &lang) const = 0;
+
+    /** called to fetch alphabet mappings for a lanugage **/
+    Q_INVOKABLE virtual AlphabetMappings alphabetMappings(int langCode) const;
+
+protected:
+    /** called as soon as editor receives focus **/
+    virtual bool activate(const TransliterationOption &option) = 0;
+
+signals:
+    /** Implementations must emit this signal when their capacity to support
+        a one or more languages has changed at run time. */
+    void capacityChanged();
+
+    /** Implementations can optionally emit additional suggestions asynchronously */
+    void transliterationOptions(const QString &word, const QStringList &options);
+};
+
+/*
+The static transliterator is built on top of a third-party tool called PhTranslator.
+It only supports a handful of Indian languages.
+*/
+class StaticTransliterationEngine : public AbstractTransliterationEngine
+{
+    Q_OBJECT
+
+public:
+    explicit StaticTransliterationEngine(QObject *parent = nullptr);
+    ~StaticTransliterationEngine();
+
+    // AbstractTransliterator interface
+    QString name() const;
+    QList<TransliterationOption> options(int lang) const;
+    bool canActivate(const TransliterationOption &option);
+    bool activate(const TransliterationOption &option);
+    QString transliterateWord(const QString &word, const TransliterationOption &option) const;
+    AlphabetMappings alphabetMappings(int langCode) const;
+};
+
+class QJSEngine;
+
+/*
+ * This engine uses the sanscript.js library (MIT) evaluated via QJSEngine to offer
+ * static in-app transliteration from English phonetic (ITRANS) to Indian scripts.
+ * The JS source is embedded as a QRC resource at qrc:/sanscript.js/sanscript.js.
+ */
+class SanscriptjsTransliterationEngine : public AbstractTransliterationEngine
+{
+    Q_OBJECT
+
+public:
+    explicit SanscriptjsTransliterationEngine(QObject *parent = nullptr);
+    ~SanscriptjsTransliterationEngine();
+
+    // AbstractTransliterationEngine interface
+    QString name() const;
+    QList<TransliterationOption> options(int lang) const;
+    bool canActivate(const TransliterationOption &option);
+    bool activate(const TransliterationOption &option);
+    QString transliterateWord(const QString &word, const TransliterationOption &option) const;
+
+private:
+    bool ensureEngine() const;
+    static QList<int> supportedLanguageCodes();
+    static QString schemeForLanguage(int lang);
+    static QString schemeForScript(QChar::Script script);
+
+    mutable QJSEngine *m_jsEngine = nullptr;
+};
+
+class QNetworkReply;
+
+/*
+ * This engine offers transliteration suggestions from dictpress based services.
+ * Dictpress is a free, open-source, single-binary web server application designed by Kailash Nadh
+ * for creating and publishing fast, searchable dictionaries, which stores data in SQLite DB files.
+ *
+ * As of now we have Alar and Olam, offering dictionaries for Kannada and Malayalam.
+ */
+class DictpressTransliterationEngine : public AbstractTransliterationEngine
+{
+    Q_OBJECT
+
+public:
+    explicit DictpressTransliterationEngine(int language, QObject *parent = nullptr);
+    ~DictpressTransliterationEngine();
+
+    bool isValid() const;
+
+    // AbstractTransliterationEngine interface
+    QString name() const;
+    QList<TransliterationOption> options(int lang) const;
+    bool canActivate(const TransliterationOption &option);
+    bool activate(const TransliterationOption &option);
+    QString transliterateWord(const QString &word, const TransliterationOption &option) const;
+
+protected:
+    void requestSuggestions(const QString &word);
+    void onReplyDestroyed();
+    void sendServiceRequest();
+    void onNetworkReplyFinished();
+    virtual void processServiceResponse(const QJsonObject &response);
+
+private:
+    int m_language = -1;
+    QString m_name;
+    QString m_baseUrl;
+
+    QString m_word;
+    QTimer *m_timer = nullptr;
+    QPointer<QNetworkReply> m_reply;
+};
+
+/*
+This class is implemented for each operating system separately, to pull in support for
+transliteration from the OS.
+*/
+class PlatformTransliterationEngine : public AbstractTransliterationEngine
+{
+    Q_OBJECT
+
+public:
+    explicit PlatformTransliterationEngine(QObject *parent = nullptr);
+    ~PlatformTransliterationEngine();
+
+    int defaultLanguage() const;
+
+    // Activates the default language and returns its code
+    int activateDefaultLanguage();
+    QList<int> supportedLanguageCodes() const;
+
+    // AbstractTransliterator interface
+    QString name() const;
+    QList<TransliterationOption> options(int lang) const;
+    bool canActivate(const TransliterationOption &option);
+    bool activate(const TransliterationOption &option);
+    QString transliterateWord(const QString &word, const TransliterationOption &option) const;
+};
+
+/*
+This is a fallback engine, that does nothing -- which means basically any keystroke
+is passed through without transliteration.
+*/
+class FallbackTransliterationEngine : public AbstractTransliterationEngine
+{
+    Q_OBJECT
+
+public:
+    explicit FallbackTransliterationEngine(AbstractTransliterationEngine *platformEngine,
+                                           QObject *parent = nullptr);
+    ~FallbackTransliterationEngine();
+
+    // AbstractTransliterator interface
+    int defaultLanguage() const;
+    QString name() const;
+    QList<TransliterationOption> options(int lang) const;
+    bool canActivate(const TransliterationOption &option);
+    bool activate(const TransliterationOption &option);
+    QString transliterateWord(const QString &word, const TransliterationOption &option) const;
+
+private:
+    QPointer<AbstractTransliterationEngine> m_platformEngine;
+};
+
+/*
+Process QInputMethod events for an editor, and routes them through the any InApp transliteration
+option supplied to the 'option' property.
+ */
+class LanguageTransliterator : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_ATTACHED(LanguageTransliterator)
+    QML_UNCREATABLE("Use as attached property.")
+
+public:
+    ~LanguageTransliterator();
+
+    static LanguageTransliterator *qmlAttachedProperties(QObject *object);
+
+    // clang-format off
+    Q_PROPERTY(bool enabled
+               READ isEnabled
+               WRITE setEnabled
+               NOTIFY enabledChanged)
+    // clang-format on
+    void setEnabled(bool val);
+    bool isEnabled() const { return m_enabled; }
+    Q_SIGNAL void enabledChanged();
+
+    // clang-format off
+    Q_PROPERTY(TransliterationOption option
+               READ option
+               WRITE setOption
+               NOTIFY optionChanged)
+    // clang-format on
+    void setOption(const TransliterationOption &val);
+    TransliterationOption option() const { return m_option; }
+    Q_SIGNAL void optionChanged();
+
+    // clang-format off
+    Q_PROPERTY(QObject *popup
+               READ popup
+               WRITE setPopup
+               NOTIFY popupChanged)
+    // clang-format on
+    void setPopup(QObject *val);
+    QObject *popup() const { return m_popup; }
+    Q_SIGNAL void popupChanged();
+
+    // clang-format off
+    Q_PROPERTY(QString currentWord
+               READ currentWord
+               NOTIFY currentWordChanged)
+    // clang-format on
+    QString currentWord() const { return m_currentWord.originalString; }
+    Q_SIGNAL void currentWordChanged();
+
+    // clang-format off
+    Q_PROPERTY(QStringList suggestions
+               READ suggestions
+               NOTIFY suggestionsChanged)
+    // clang-format on
+    QStringList suggestions() const { return m_currentWord.suggestions; }
+    Q_SIGNAL void suggestionsChanged();
+
+    // clang-format off
+    Q_PROPERTY(int currentSuggestionIndex
+               READ currentSuggestionIndex
+               NOTIFY currentSuggestionIndexChanged)
+    // clang-format on
+    int currentSuggestionIndex() const { return m_currentWord.currentSuggestionIndex; }
+    Q_SIGNAL void currentSuggestionIndexChanged();
+
+    // clang-format off
+    Q_PROPERTY(QRect textRect
+               READ textRect
+               NOTIFY textRectChanged)
+    // clang-format on
+    QRect textRect() const { return m_currentWord.textRect; }
+    Q_SIGNAL void textRectChanged() const;
+
+    // clang-format off
+    Q_PROPERTY(QObject *editor
+               READ editor
+               CONSTANT )
+    // clang-format on
+    QObject *editor() const { return m_editor; }
+
+protected:
+    bool eventFilter(QObject *object, QEvent *event);
+
+private:
+    LanguageTransliterator(QObject *parent = nullptr);
+    bool updateWordFromInput(const QKeyEvent *keyEvent);
+    bool handleBackspace(const QKeyEvent *keyEvent);
+    bool handleDelete(const QKeyEvent *keyEvent);
+    bool commitWordToEditor();
+    void resetCurrentWord();
+    void useSuggestions(const QString &word, const QStringList &suggestions);
+    void setCurrentSuggestions(const QStringList &suggestions);
+    void setCurrentSuggestionIndex(int val);
+
+private:
+    struct Word
+    {
+        int start = -1;
+        int end = -1;
+        QRect textRect;
+        QString originalString;
+        QStringList suggestions;
+        int currentSuggestionIndex = 0;
+    } m_currentWord;
+
+    bool m_enabled = false;
+    QObject *m_editor = nullptr;
+    QObject *m_popup = nullptr;
+    TransliterationOption m_option;
+};
+
+/*
+Code to evaluate language boundaries and perform operations on them.
+ */
+struct ScriptBoundary
+{
+    Q_GADGET
+    QML_VALUE_TYPE(scriteScriptBoundary)
+
+public:
+    // clang-format off
+    Q_PROPERTY(int start
+               MEMBER start)
+    // clang-format on
+    int start = -1;
+
+    // clang-format off
+    Q_PROPERTY(int end
+               MEMBER end)
+    // clang-format on
+    int end = -1;
+
+    // clang-format off
+    Q_PROPERTY(QString text
+               MEMBER text)
+    // clang-format on
+    QString text;
+
+    // clang-format off
+    Q_PROPERTY(QChar::Script script
+               MEMBER script)
+    // clang-format on
+    QChar::Script script = QChar::Script_Unknown;
+
+    // clang-format off
+    Q_PROPERTY(QString fontFamily
+               READ fontFamily)
+    // clang-format on
+    QString fontFamily() const;
+
+    // clang-format off
+    Q_PROPERTY(bool valid
+               READ isValid)
+    // clang-format on
+    bool isValid() const;
+
+    ScriptBoundary() { }
+    ScriptBoundary(const ScriptBoundary &other) { *this = other; }
+    ~ScriptBoundary() { }
+    ScriptBoundary &operator=(const ScriptBoundary &other)
+    {
+        this->start = other.start;
+        this->end = other.end;
+        this->text = other.text;
+        this->script = other.script;
+        return *this;
+    }
+    bool operator==(const ScriptBoundary &other) const
+    {
+        return start == other.start && end == other.end && text == other.text
+                && script == other.script;
+    }
+    bool operator!=(const ScriptBoundary &other) const { return !(*this == other); }
+};
+Q_DECLARE_METATYPE(ScriptBoundary)
+Q_DECLARE_METATYPE(QList<ScriptBoundary>)
+
+class LanguageIconProvider : public QQuickImageProvider
+{
+public:
+    explicit LanguageIconProvider();
+    ~LanguageIconProvider();
+
+    static QString name();
+    static QUrl iconUrlFor(const Language &language);
+
+    // QQuickImageProvider interface
+    QImage requestImage(const QString &id, QSize *size, const QSize &requestedSize);
+};
+
+/*
+This class ties all the pieces together.
+*/
+class LanguageEngine : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Use it as a singleton instead.")
+
+public:
+    static LanguageEngine *instance();
+    ~LanguageEngine();
+
+    // clang-format off
+    Q_PROPERTY(AvailableLanguages *availableLanguages
+               READ availableLanguages
+               CONSTANT )
+    // clang-format on
+    AvailableLanguages *availableLanguages() const { return m_availableLanguages; }
+
+    // clang-format off
+    Q_PROPERTY(SupportedLanguages *supportedLanguages
+               READ supportedLanguages
+               CONSTANT )
+    // clang-format on
+    SupportedLanguages *supportedLanguages() const { return m_supportedLanguages; }
+
+    // clang-format off
+    Q_PROPERTY(bool handleLanguageSwitch
+               READ isHandleLanguageSwitch
+               WRITE setHandleLanguageSwitch
+               NOTIFY handleLanguageSwitchChanged)
+    // clang-format on
+    void setHandleLanguageSwitch(bool val);
+    bool isHandleLanguageSwitch() const { return m_handleLanguageSwitch; }
+    Q_SIGNAL void handleLanguageSwitchChanged();
+
+    Q_INVOKABLE bool setScriptFontFamily(QChar::Script script, const QString &fontFamily);
+    Q_INVOKABLE QString scriptFontFamily(QChar::Script script) const;
+
+    Q_INVOKABLE QStringList scriptFontFamilies(QChar::Script script) const;
+
+    Q_INVOKABLE bool hasPlatformLanguages() const;
+
+    QStringList bundledFontFilesForScript(QChar::Script script) const;
+
+    QList<int> platformLanguages() const;
+    QList<TransliterationOption> queryTransliterationOptions(int language) const;
+
+    static QChar::Script determineScript(const QString &text);
+    static QList<ScriptBoundary> determineBoundaries(const QString &paragraph);
+    static void determineBoundariesAndInsertText(QTextCursor &cursor, const QString &paragraph);
+    static QString formattedInHtml(const QString &paragraph);
+    static int wordCount(const QString &paragraph);
+    static int fastWordCount(const QString &paragraph);
+    static int sentenceCount(const QString &paragraph);
+    static int fastSentenceCount(const QString &paragraph);
+    static QVector<QTextLayout::FormatRange>
+    mergeTextFormats(const QList<ScriptBoundary> &boundaries,
+                     const QVector<QTextLayout::FormatRange> &formats);
+    static void polishFontsAndInsertTextAtCursor(
+            QTextCursor &cursor, const QString &text,
+            const QVector<QTextLayout::FormatRange> &formats = QVector<QTextLayout::FormatRange>());
+    static void insertTextAtCursor(
+            QTextCursor &cursor, const QString &text,
+            const QVector<QTextLayout::FormatRange> &formats = QVector<QTextLayout::FormatRange>(),
+            bool polishFonts = false);
+
+    static void init(const char *uri, QQmlEngine *qmlEngine);
+
+signals:
+    void scriptFontFamilyChanged(QChar::Script script, const QString &fontFamily);
+    void transliterationOptionsUpdated();
+
+protected:
+    bool eventFilter(QObject *object, QEvent *event);
+
+private:
+    explicit LanguageEngine(QObject *parent = nullptr);
+
+    void loadConfiguration();
+    void saveConfiguration();
+    void activateTransliterationOptionOnActiveLanguage();
+
+private:
+    bool m_handleLanguageSwitch = true;
+    QString m_configFileName;
+    AvailableLanguages *m_availableLanguages = nullptr;
+    SupportedLanguages *m_supportedLanguages = nullptr;
+    QMap<QChar::Script, QString> m_defaultScriptFontFamily, m_scriptFontFamily;
+    QList<AbstractTransliterationEngine *> m_transliterators;
+    QMap<QChar::Script, QStringList> m_bundledFontFiles;
+};
+
+class PlatformLanguageObserver : public QQuickItem
+{
+    Q_OBJECT
+    QML_ELEMENT
+
+public:
+    PlatformLanguageObserver(QQuickItem *parent = nullptr);
+    ~PlatformLanguageObserver();
+
+    // clang-format off
+    Q_PROPERTY(int activeLanguageCode
+               READ activeLanguageCode
+               NOTIFY activeLanguageCodeChanged)
+    // clang-format on
+    int activeLanguageCode() const { return m_activeLanguageCode; }
+    Q_SIGNAL void activeLanguageCodeChanged();
+
+    // clang-format off
+    Q_PROPERTY(Language activeLanguage
+               READ activeLanguage
+               NOTIFY activeLanguageCodeChanged)
+    // clang-format on
+    Language activeLanguage() const;
+
+protected:
+    void setupObservation();
+
+private:
+    void setActiveLanguageCode(int val);
+
+private:
+    int m_activeLanguageCode = -1;
+};
+
+// Auto-generated class from languageengine_p.h
+// The entire QtChar class is regenerated at build time by tools/qtchar_gen.py
+// to stay in sync with QChar::Script from the actual Qt version being used.
+#include "languageengine_p.h"
+
+#endif // LANGUAGEENGINE_H

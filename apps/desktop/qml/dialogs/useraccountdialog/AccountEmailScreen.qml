@@ -1,0 +1,197 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Window
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../"
+import "../../globals"
+import "../../controls"
+import "../../helpers"
+
+Item {
+    id: root
+
+    readonly property bool modal: true
+    readonly property string title: "Setup your Scrite account"
+
+    Component.onCompleted: Qt.callLater(_emailField.forceActiveFocus)
+
+    Image {
+        anchors.fill: parent
+        source: "qrc:/images/useraccountdialogbg.png"
+        fillMode: Image.PreserveAspectCrop
+    }
+
+    Item {
+        anchors.fill: parent
+        anchors.topMargin: 50
+        anchors.leftMargin: 50
+        anchors.rightMargin: 175
+        anchors.bottomMargin: 50
+
+        TabSequenceManager {
+            id: _userInfoFields
+        }
+
+        ColumnLayout {
+            anchors.centerIn: parent
+
+            width: parent.width
+            spacing: 20
+            enabled: !_checkUserCall.busy
+            opacity: enabled ? 1 : 0.5
+
+            VclLabel {
+                Layout.fillWidth: true
+
+                text: "Please provide us your email."
+                font.bold: true
+                font.pointSize: Runtime.idealFontMetrics.font.pointSize + 2
+                wrapMode: Text.WordWrap
+            }
+
+            VclLabel {
+                Layout.fillWidth: true
+
+                text: "Your free trial and other subscription plans will be linked to this email."
+                wrapMode: Text.WordWrap
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 20
+            }
+
+            VclTextField {
+                id: _emailField
+
+                Layout.fillWidth: true
+
+                TabSequenceItem.manager: _userInfoFields
+                TabSequenceItem.sequence: 0
+
+                text: _checkUserCall.email
+                font.pointSize: Runtime.idealFontMetrics.font.pointSize + 2
+
+                maximumLength: 128
+                selectByMouse: true
+                undoRedoEnabled: true
+
+                onReturnPressed: if(_submit.enabled) _submit.clicked()
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                VclCheckBox {
+                    id: _userInfoConsent
+
+                    TabSequenceItem.manager: _userInfoFields
+                    TabSequenceItem.sequence: 1
+
+                    text: "Use my email, device info and location to help secure my account."
+                    topPadding: 0; bottomPadding: 0
+
+                    onToggled: Qt.callLater(_submit.determineEnabled)
+                }
+
+                VclLabel {
+                    text: "ⓘ" + (_userInfoConsentHelp.containsMouse ? " Privacy Policy" : "")
+
+                    MouseArea {
+                        id: _userInfoConsentHelp
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Qt.openUrlExternally("https://www.scrite.io/privacy-policy#data")
+                    }
+
+                    ToolTipPopup {
+                        container: _userInfoConsentHelp
+                        text: "Your email and user-info is used to identify your account, tag it to your device for security, determine applicable currency for billing, and tailor Scrite to your region. Click to read our privacy policy."
+                        visible: _userInfoConsentHelp.containsMouse
+                    }
+                }
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 20
+            }
+
+            VclButton {
+                id: _submit
+
+                Component.onCompleted: determineEnabled()
+                Layout.alignment: Qt.AlignRight
+
+                function determineEnabled() {
+                    enabled = Runtime.validateEmail(_emailField.text.trim()) && _userInfoConsent.checked
+                }
+
+                text: "Continue »"
+
+                Connections {
+                    target: _emailField
+
+                    function onTextEdited() {
+                        Qt.callLater(_submit.determineEnabled)
+                    }
+                }
+
+                onClicked: _checkUserCall.check()
+            }
+        }
+
+        BusyIndicator {
+            anchors.centerIn: parent
+
+            running: _checkUserCall.busy
+        }
+    }
+
+    AppCheckUserRestApiCall {
+        id: _checkUserCall
+
+        function check() {
+            const _email = _emailField.text.trim()
+            if(Runtime.validateEmail(_email)) {
+                email = _email
+
+                call()
+            }
+        }
+
+        onFinished: {
+            if(hasError || !hasResponse) {
+                const errMsg = hasError ? errorMessage : "Error determining information about your account. Please try again."
+                MessageBox.information("Error", errMsg)
+                return
+            }
+
+            Session.set("checkUserResponse", userInfo)
+            Runtime.shoutout(Runtime.announcementIds.userAccountDialogScreen, "JunctionScreen")
+        }
+    }
+}
+
+

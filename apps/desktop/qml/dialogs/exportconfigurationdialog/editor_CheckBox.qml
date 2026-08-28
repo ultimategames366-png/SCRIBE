@@ -1,0 +1,61 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../../globals"
+import "../../controls"
+import "../../helpers"
+
+ColumnLayout {
+    id: root
+
+    property scriteObjectConfigField fieldInfo
+    property AbstractExporter exporter
+    property TabSequenceManager tabSequence
+
+    VclCheckBox {
+        id: _checkBox
+
+        Layout.fillWidth: true
+
+        TabSequenceItem.manager: root.tabSequence
+
+        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+        text: root.fieldInfo.label
+        checkable: true
+        checked: root.exporter ? root.exporter.getConfigurationValue(root.fieldInfo.name) : false
+
+        onToggled: root.exporter ? root.exporter.setConfigurationValue(root.fieldInfo.name, _checkBox.checked) : false
+    }
+
+    VclLabel {
+        Layout.fillWidth: true
+
+        color: Runtime.colors.primary.c600.background
+        visible: text !== ""
+        wrapMode: Text.WordWrap
+        leftPadding: 2*_checkBox.leftPadding + _checkBox.implicitIndicatorWidth
+        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+
+        text: root.fieldInfo.note
+    }
+}
