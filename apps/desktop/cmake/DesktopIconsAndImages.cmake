@@ -224,7 +224,6 @@ set(SCRITE_DESKTOP_IMAGE_FILES
   "images/useraccountdialogbg.png"
   "images/prodicon.png"
   "images/exclprodicon.png"
-  "images/splash.png"
 )
 
 qt_add_resources(Scrite SCRITE_ICON_FILES

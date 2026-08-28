@@ -305,7 +305,6 @@ set(SCRITE_DESKTOP_SINGLETON_QML_FILES
   "qml/dialogs/SettingsDialog.qml"
   "qml/dialogs/ShortcutEditorDialog.qml"
   "qml/dialogs/ShortcutInputDialog.qml"
-  "qml/dialogs/SplashScreen.qml"
   "qml/dialogs/StructureIndexCardFieldsDialog.qml"
   "qml/dialogs/StructureStoryBeatsDialog.qml"
   "qml/dialogs/SubscriptionDetailsDialog.qml"

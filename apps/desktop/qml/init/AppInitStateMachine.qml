@@ -185,7 +185,8 @@ QSM.StateMachine {
      * If Scrite recently moved the user's settings, recent files, and vault to
      * a new location on disk, this state shows a one-time notice explaining the
      * change. The dialog is purely informational — there is no decline path.
-     * After this, the state machine branches based on login and subscription status.
+     * After this, the state machine branches directly to the home/file state or
+     * the login-required state based on subscription entitlement.
      */
     QSM.State {
         id: s5LegacyMigration
@@ -205,57 +206,11 @@ QSM.StateMachine {
         }
 
         QSM.SignalTransition {
-            signal: s5LegacyMigration.done; targetState: s6Splash
-            guard: !Scrite.user.loggedIn
-        }
-        QSM.SignalTransition {
             signal: s5LegacyMigration.done; targetState: s7HomeOrFile
-            guard: Scrite.user.loggedIn && Runtime.allowAppUsage
-        }
-        QSM.SignalTransition {
-            signal: s5LegacyMigration.done; targetState: s8LoginRequired
-            guard: Scrite.user.loggedIn && !Runtime.allowAppUsage
-        }
-    }
-
-    /*
-     * Entered when the user is not logged in. Shows the splash screen and waits
-     * for it to close (either by user interaction or the 5-second auto-dismiss
-     * timer). On Windows versions older than 10, an additional compatibility
-     * warning is shown before proceeding. Exits to s7HomeOrFile or s8LoginRequired
-     * depending on subscription entitlement at that point.
-     */
-    QSM.State {
-        id: s6Splash
-
-        signal closed()
-
-        onEntered: {
-            let splash = SplashScreen.launch()
-            if (splash) {
-                splash.closed.connect(() => {
-                    if (Platform.isWindowsDesktop && Platform.osMajorVersion < 10) {
-                        MessageBox.information("",
-                            "The Windows version of Scrite works best on Windows 10 or higher. " +
-                            "While it may work on earlier versions of Windows, we don't actively " +
-                            "test on them. We recommend that you use Scrite on PCs with Windows 10 or higher.",
-                            () => s6Splash.closed()
-                        )
-                    } else {
-                        s6Splash.closed()
-                    }
-                })
-            } else {
-                Qt.callLater(() => s6Splash.closed())
-            }
-        }
-
-        QSM.SignalTransition {
-            signal: s6Splash.closed; targetState: s7HomeOrFile
             guard: Runtime.allowAppUsage
         }
         QSM.SignalTransition {
-            signal: s6Splash.closed; targetState: s8LoginRequired
+            signal: s5LegacyMigration.done; targetState: s8LoginRequired
             guard: !Runtime.allowAppUsage
         }
     }
