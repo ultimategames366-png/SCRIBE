@@ -34,7 +34,9 @@ AutoUpdate *AutoUpdate::instance()
 AutoUpdate::AutoUpdate(QObject *parent) : QObject(parent)
 {
     // CAPTURE_CALL_GRAPH;
-    QTimer::singleShot(1000, this, &AutoUpdate::checkForUpdates);
+    // Defer the update check so that it does not slow down application startup,
+    // or fire network requests while the user is still being set up.
+    QTimer::singleShot(60 * 1000, this, &AutoUpdate::checkForUpdates);
 }
 
 AutoUpdate::~AutoUpdate() { }
@@ -55,6 +57,13 @@ void AutoUpdate::setUpdateInfo(const QJsonObject &val)
 
 void AutoUpdate::checkForUpdates()
 {
+    // Skip the check entirely when Internet access is not available, so that the
+    // app remains fully usable offline. The hourly retry will try again later.
+    if (!RestApi::instance()->isNetworkAvailable()) {
+        this->checkForUpdatesAfterSometime();
+        return;
+    }
+
     AppLatestReleaseRestApiCall *api = new AppLatestReleaseRestApiCall(this);
     api->setAutoDelete(true);
     api->setReportNetworkErrors(false);

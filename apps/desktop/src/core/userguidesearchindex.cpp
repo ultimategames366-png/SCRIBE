@@ -30,7 +30,11 @@ static const char *userGuideSearchIndex = "userGuideSearchIndex";
 
 UserGuideSearchIndex::UserGuideSearchIndex(QObject *parent) : QAbstractListModel(parent)
 {
-    QTimer::singleShot(0, this, &UserGuideSearchIndex::checkSearchIndexForUpdates);
+    // Load the locally cached search index right away, so that help search works
+    // instantly and even when the machine is offline. The (optional) update check
+    // against the user-guide website is deferred, to keep application startup fast.
+    this->loadSearchIndex();
+    QTimer::singleShot(60 * 1000, this, &UserGuideSearchIndex::checkSearchIndexForUpdates);
 }
 
 UserGuideSearchIndex::~UserGuideSearchIndex() { }

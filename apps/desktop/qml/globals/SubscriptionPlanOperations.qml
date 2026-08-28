@@ -382,6 +382,8 @@ Item {
     QtObject {
         id: _private
 
+        property int taxonomyRetryDelay: 500
+
         property Component planActivationApi: SubscriptionPlanActivationRestApiCall {
             property var plan // Should ideally be scriteUserSubscriptionPlanInfo
             property VclDialog waitDialog
@@ -431,15 +433,22 @@ Item {
         function loadTaxonomy() {
             let api = Qt.createQmlObject("import io.scrite.components; AppPlanTaxonomyRestApiCall {}", _private)
             api.finished.connect( () => {
-                                     if(api.hasError || !api.hasResponse)
-                                        Runtime.execLater(_private, 500, loadTaxonomy)
-                                     else
+                                     if(api.hasError || !api.hasResponse) {
+                                        // Back off progressively (capped at 10 minutes) so that
+                                        // machines without Internet access are not hammered with
+                                        // rapid-fire requests. The check keeps retrying in the
+                                        // background, and stops once the taxonomy is loaded.
+                                        _private.taxonomyRetryDelay = Math.min(_private.taxonomyRetryDelay*2, 600000)
+                                        Runtime.execLater(_private, _private.taxonomyRetryDelay, loadTaxonomy)
+                                     } else {
                                         root.taxonomy = api.taxonomy
+                                     }
                                      api.destroy()
                                  })
             if(!api.call()) {
                 api.destroy()
-                Runtime.execLater(_private, 500, loadTaxonomy)
+                _private.taxonomyRetryDelay = Math.min(_private.taxonomyRetryDelay*2, 600000)
+                Runtime.execLater(_private, _private.taxonomyRetryDelay, loadTaxonomy)
             }
         }
 
