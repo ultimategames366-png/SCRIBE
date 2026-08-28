@@ -1,0 +1,97 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Controls
+
+import io.scrite.components
+
+Item {
+    id: root
+
+    signal select(rect rectangle)
+    signal tryStart(point pos)
+
+    property bool selectionMode: false
+    property bool active: false
+    property bool selecting: false
+
+    Rectangle {
+        id: _selection
+
+        property point from: Qt.point(0,0)
+        property point to: Qt.point(0,0)
+
+        property rect rectangle: {
+            if(from === to)
+                return Qt.rect(from.x, from.y, 1, 1)
+            return Qt.rect( Math.min(from.x,to.x), Math.min(from.y,to.y), Math.abs(to.x-from.x), Math.abs(to.y-from.y) )
+        }
+
+        x: rectangle.x
+        y: rectangle.y
+        width: rectangle.width
+        height: rectangle.height
+
+        color: Color.translucent(Runtime.colors.palette.highlight,0.2)
+        border { width: 2; color: Runtime.colors.palette.highlight }
+        visible: root.active
+    }
+
+    MouseArea {
+        anchors.fill: parent
+
+        acceptedButtons: Qt.LeftButton
+
+        onPressed: (mouse) => {
+                       if(mouse.modifiers & Qt.ControlModifier || parent.selectionMode) {
+                           let pos = Qt.point(mouse.x, mouse.y)
+                           root.tryStart(pos)
+
+                           if(root.active) {
+                               _selection.from = pos
+                               _selection.to = _selection.from
+                               root.selecting = true
+                               mouse.accepted = true
+                           } else {
+                               mouse.accepted = false
+                           }
+                       } else {
+                           root.active = false
+                           mouse.accepted = false
+                       }
+                   }
+
+        onPositionChanged: (mouse) => {
+                               if(root.active) {
+                                   _selection.to = Qt.point(mouse.x, mouse.y)
+                                   mouse.accepted = true
+                               } else
+                               mouse.accepted = false
+                           }
+
+        onReleased:  (mouse) => {
+                         if(root.active) {
+                             _selection.to = Qt.point(mouse.x, mouse.y)
+                             root.select(_selection.rectangle)
+                             root.selecting = false
+                             root.active = false
+                             mouse.accepted = true
+                         } else {
+                             mouse.accepted = false
+                         }
+                     }
+    }
+}

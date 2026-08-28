@@ -1,0 +1,67 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../../globals"
+import "../../controls"
+import "../../helpers"
+
+ColumnLayout {
+    id: root
+    property scriteObjectConfigField fieldInfo
+    property AbstractReportGenerator report
+
+    spacing: 6
+
+    VclLabel {
+        Layout.fillWidth: true
+
+        elide: Text.ElideRight
+        wrapMode: Text.WordWrap
+        maximumLineCount: 2
+
+        text: root.fieldInfo.label
+    }
+
+    VclLabel {
+        Layout.fillWidth: true
+        Layout.rightMargin: 10
+
+        visible: text !== ""
+        wrapMode: Text.WordWrap
+        font.italic: true
+        font.pointSize: Runtime.minimumFontMetrics.font.pointSize
+
+        text: root.fieldInfo.note
+    }
+
+    VclSpinBox {
+        from: root.fieldInfo.min
+        to: root.fieldInfo.max
+
+        value: root.report ? root.report.getConfigurationValue(root.fieldInfo.name) : 0
+
+        onValueModified: {
+            if(root.report)
+                root.report.setConfigurationValue(root.fieldInfo.name, value)
+        }
+    }
+}

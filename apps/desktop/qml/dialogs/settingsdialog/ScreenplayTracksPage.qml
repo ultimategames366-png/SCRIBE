@@ -1,0 +1,229 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../../globals"
+import "../../helpers"
+import "../../controls"
+
+Item {
+    id: root
+
+    clip: true
+
+    VclGroupBox {
+        anchors.fill: parent
+        anchors.margins: 10
+        anchors.leftMargin: 0
+
+        spacing: 10
+
+        enabled: Runtime.appFeatures.structure.enabled
+        opacity: enabled ? 1 : 0.5
+
+        label: VclCheckBox {
+            text: "Display tracks"
+
+            checked: Runtime.screenplayTracksSettings.displayTracks
+
+            onToggled: Runtime.screenplayTracksSettings.displayTracks = !Runtime.screenplayTracksSettings.displayTracks
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+
+            enabled: Runtime.screenplayTracksSettings.displayTracks
+            opacity: enabled ? 1 : 0.5
+
+            RowLayout {
+                VclCheckBox {
+                    Layout.fillWidth: true
+
+                    text: "Display structure tracks"
+                    checked: enabled ? Runtime.screenplayTracksSettings.displayStructureTracks : false
+
+                    onToggled: Runtime.screenplayTracksSettings.displayStructureTracks = !Runtime.screenplayTracksSettings.displayStructureTracks
+                }
+
+                VclCheckBox {
+                    Layout.fillWidth: true
+
+                    text: "Display stack/sequence tracks"
+                    checked: enabled ? Runtime.screenplayTracksSettings.displayStacks : false
+
+                    onToggled: Runtime.screenplayTracksSettings.displayStacks = !Runtime.screenplayTracksSettings.displayStacks
+                }
+            }
+
+            VclGroupBox {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                label: VclCheckBox {
+                    id: _chkKeywordsTracks
+
+                    text: "Display keywords tracks"
+                    checked: enabled ? Runtime.screenplayTracksSettings.displayKeywordsTracks : false
+
+                    onToggled: Runtime.screenplayTracksSettings.displayKeywordsTracks = !Runtime.screenplayTracksSettings.displayKeywordsTracks
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+
+                    VclLabel {
+                        Layout.fillWidth: true
+                        Layout.bottomMargin: 10
+
+                        wrapMode: Text.WordWrap
+                        text: _private.keywords.length === 0 ? "All keywords are captured." : "Only the following keywords are captured in this document."
+                    }
+
+                    Flickable {
+                        id: _keywordsFlick
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        ScrollBar.vertical: VclScrollBar { }
+
+                        contentWidth: width
+                        contentHeight: _keywordsFlickLayout.height
+
+                        clip: true
+                        enabled: _chkKeywordsTracks.checked
+                        opacity: enabled ? 1 : 0.5
+
+                        ColumnLayout {
+                            id: _keywordsFlickLayout
+
+                            width: _keywordsFlick.width - 20
+
+                            TextListInput {
+                                id: _keywordsList
+
+                                Layout.fillWidth: true
+
+                                textList: _private.keywords
+                                completionStrings: Scrite.document.structure.sceneTags
+                                addTextButtonTooltip: "Click here to include a keyword to allowed list, and eliminate others."
+                                font: Runtime.idealFontMetrics.font
+                                labelText: "Keywords"
+                                labelIconSource:  Runtime.themedIcon("qrc:/icons/action/keyword.png")
+                                labelIconVisible: true
+
+                                readOnly: Scrite.document.readOnly
+
+                                onEnsureVisible: (item, area) => {  }
+                                onTextClicked: (text, source) => {  }
+                                onTextCloseRequest: (text, source) => { _private.removeKeyword(text) }
+                                onConfigureTextRequest: (text, tag) => { tag.closable = true }
+                                onNewTextRequest: (text) => { _private.addKeyword(text) }
+                                onNewTextCancelled: () => { }
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+
+                                Repeater {
+                                    model: Scrite.document.structure.sceneTags
+
+                                    delegate: VclCheckBox {
+                                        id: _delegate
+                                        required property int index
+                                        required property string modelData
+
+                                        text: Runtime.idealFontMetrics.elidedText(_delegate.modelData, Qt.ElideRight, _keywordsFlick.width*0.6, 0)
+                                        checked: _private.keywords.indexOf(_delegate.modelData) >= 0
+
+                                        onToggled: {
+                                            if(checked)
+                                                _private.addKeyword(_delegate.modelData)
+                                            else
+                                                _private.removeKeyword(_delegate.modelData)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    DisabledFeatureNotice {
+        anchors.fill: parent
+
+        visible: !Runtime.appFeatures.structure.enabled
+        featureName: "Structure"
+    }
+
+    QtObject {
+        id: _private
+
+        Component.onCompleted: {
+            const userData = Scrite.document.userData || {}
+            if(userData && userData.allowedOpenTagsInTracks !== undefined && userData.allowedOpenTagsInTracks.length > 0)
+                keywords = userData.allowedOpenTagsInTracks
+        }
+
+        property var keywords: []
+
+        function addKeyword(keyword) {
+            if(keyword === undefined || keyword === "")
+                return
+
+            keyword = keyword.toLowerCase()
+            if(keywords.indexOf(keyword) >= 0)
+                return
+
+            let k = keywords
+            k.push(keyword)
+            keywords = k
+            saveKeywords()
+        }
+
+        function removeKeyword(keyword) {
+            if(keyword === undefined || keyword === "")
+                return
+
+            keyword = keyword.toLowerCase()
+
+            const idx = keywords.indexOf(keyword)
+            if(idx < 0)
+                return
+
+            let k = keywords
+            k.splice(idx, 1)
+            keywords = k
+            saveKeywords()
+        }
+
+        function saveKeywords() {
+            let userData = Scrite.document.userData
+            userData.allowedOpenTagsInTracks = keywords
+            Scrite.document.userData = userData
+        }
+    }
+}

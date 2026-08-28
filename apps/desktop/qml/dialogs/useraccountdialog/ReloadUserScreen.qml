@@ -1,0 +1,69 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../"
+import "../../globals"
+
+Item {
+    id: root
+
+    readonly property bool modal: true
+    readonly property string title: "Fetching Profile Data ..."
+
+    Connections {
+        target: Scrite.user
+
+        function onLoggedInChanged() {
+            if(_private.timer && _private.timer.running) {
+                _private.timer.stop()
+                _private.timer.destroy()
+            }
+
+            _private.maybeShowUserProfileScreen()
+        }
+    }
+
+    BusyIndicator {
+        anchors.centerIn: parent
+        running: Scrite.user.busy
+    }
+
+    Component.onCompleted: {
+        _private.timer = Runtime.execLater(_private, 100, _private.maybeShowUserProfileScreen)
+    }
+
+    QtObject {
+        id: _private
+
+        property Timer timer
+
+        function maybeShowUserProfileScreen() {
+            if(Scrite.user.loggedIn) {
+                const requiresOnboarding = Runtime.requiresUserOnboarding()
+                if(requiresOnboarding) {
+                    Runtime.shoutout(Runtime.announcementIds.userAccountDialogScreen, "UserOnboardingScreen")
+                } else {
+                    Runtime.shoutout(Runtime.announcementIds.userAccountDialogScreen, "UserProfileScreen")
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,135 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../../../globals"
+import "../../../helpers"
+import "../../../dialogs"
+import "../../../controls"
+import "../../../structureview"
+import "../sceneparteditors"
+
+AbstractScenePartEditor {
+    id: root
+
+    Flickable {
+        id: _flickable
+
+        anchors.fill: parent
+        anchors.margins: 5
+        anchors.rightMargin: 0
+
+        clip: interactive
+        contentY: 0
+        interactive: contentHeight > height
+        contentWidth: _layout.width
+        contentHeight: _layout.height
+        flickableDirection: Flickable.VerticalFlick
+
+        ScrollBar.vertical: VclScrollBar { }
+
+        Column {
+            id: _layout
+
+            width: _flickable.ScrollBar.vertical.needed ? _flickable.width-20 : _flickable.width
+
+            Loader {
+                width: parent.width
+
+                active: !Runtime.screenplayEditorSettings.displaySceneCharacters
+                visible: active
+
+                sourceComponent: SceneStoryBeatTagsPartEditor {
+                    index: root.index
+                    sceneID: root.sceneID
+                    screenplayElement: root.screenplayElement
+                    screenplayElementDelegateHasFocus: root.hasFocus
+
+                    partName: "StoryBeats-SidePanel"
+                    isCurrent: root.isCurrent
+                    zoomLevel: root.zoomLevel * 0.75
+                    fontMetrics: root.fontMetrics
+                    pageMargins: root.pageMargins
+                    screenplayAdapter: root.screenplayAdapter
+
+                    onEnsureVisible: (item, area) => { root.ensureVisible(item, area) }
+
+                    // TODO
+                    onSceneTagAdded: (tagName) => { }
+                    onSceneTagClicked: (tagName) => { }
+                }
+            }
+
+            Loader {
+                width: parent.width
+
+                active: !Runtime.screenplayEditorSettings.displaySceneCharacters
+                visible: active
+
+                sourceComponent: SceneCharacterListPartEditor {
+                    index: root.index
+                    sceneID: root.sceneID
+                    screenplayElement: root.screenplayElement
+                    screenplayElementDelegateHasFocus: root.hasFocus
+
+                    partName: "CharacterList-SidePanel"
+                    isCurrent: root.isCurrent
+                    zoomLevel: root.zoomLevel * 0.75
+                    fontMetrics: root.fontMetrics
+                    pageMargins: root.pageMargins
+                    screenplayAdapter: root.screenplayAdapter
+
+                    onEnsureVisible: (item, area) => { root.ensureVisible(item, area) }
+
+                    // TODO
+                    onNewCharacterAdded: (characterName) => { }
+                }
+            }
+
+            Loader {
+                width: parent.width
+
+                active: !Runtime.screenplayEditorSettings.displaySceneSynopsis
+                visible: active
+
+                sourceComponent: SceneSynopsisPartEditor {
+                    Layout.fillWidth: true
+
+                    index: root.index
+                    sceneID: root.sceneID
+                    screenplayElement: root.screenplayElement
+                    screenplayElementDelegateHasFocus: root.hasFocus
+
+                    partName: "Synopsis-SidePanel"
+                    isCurrent: root.isCurrent
+                    zoomLevel: root.zoomLevel
+                    fontMetrics: root.fontMetrics
+                    pageMargins: root.pageMargins
+                    screenplayAdapter: root.screenplayAdapter
+
+                    onEnsureVisible: (item, area) => { root.ensureVisible(item, area) }
+                }
+            }
+        }
+    }
+}

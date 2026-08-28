@@ -1,0 +1,235 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+Flickable {
+    id: root
+
+    property int tabSequenceIndex: 0
+
+    property bool undoRedoEnabled: true
+    property bool spellCheckEnabled: true
+    property bool scrollBarRequired: contentHeight > height
+    property bool tabSequenceEnabled: true
+    property bool enforceDefaultFont: true
+    property bool enforceHeadingFontSize: false
+    property bool adjustTextWidthBasedOnScrollBar: true
+
+    property alias text: _textArea.text
+    property alias font: _textArea.font
+    property alias color: _textArea.color
+    property alias readOnly: _textArea.readOnly
+    property alias background: _textArea.background
+    property alias textDocument: _textArea.textDocument
+    property alias placeholderText: _textArea.placeholderText
+
+    property Item tabItem
+    property Item textArea: _textArea
+    property Item backTabItem
+
+    property SyntaxHighlighter syntaxHighlighter: Object.firstChildByType(_textArea, "SyntaxHighlighter") as SyntaxHighlighter
+    property TabSequenceManager tabSequenceManager
+
+    signal textEdited()
+    signal editingFinished()
+
+    FlickScrollSpeedControl.factor: Runtime.workspaceSettings.flickScrollSpeedFactor
+
+    ScrollBar.vertical: VclScrollBar { flickable: root }
+
+    contentWidth: _textArea.width
+    contentHeight: _textArea.height
+
+    clip: true
+
+    TextArea {
+        id: _textArea
+
+        width: root.width - (root.scrollBarRequired && root.adjustTextWidthBasedOnScrollBar ? 20 : 0)
+        height: Math.max(root.height-topPadding-bottomPadding, contentHeight+20)
+
+        topPadding: 5
+        leftPadding: 5
+        rightPadding: 5
+        bottomPadding: 5
+
+        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+        verticalAlignment: Text.AlignTop
+        selectByMouse: true
+        selectByKeyboard: true
+
+        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+        PlaceholderVisibility.visible: !activeFocus && text === ""
+
+        KeyNavigation.tab: root.tabItem
+        KeyNavigation.backtab: root.backTabItem
+        KeyNavigation.priority: KeyNavigation.AfterItem
+
+        SyntaxHighlighter.delegates: [
+            LanguageFontSyntaxHighlighterDelegate {
+                enabled: Runtime.screenplayEditorSettings.useLanguageFonts
+                defaultFont: _textArea.font
+                enforceDefaultFont: root.enforceDefaultFont
+            },
+
+            HeadingFontSyntaxHighlighterDelegate {
+                enabled: root.enforceHeadingFontSize
+                Component.onCompleted: initializeWithNormalFontAs(_textArea.font)
+            },
+
+            SpellCheckSyntaxHighlighterDelegate {
+                id: _spellChecker
+                enabled: root.spellCheckEnabled
+                cursorPosition: _textArea.cursorPosition
+            }
+        ]
+        SyntaxHighlighter.textDocument: textDocument
+        SyntaxHighlighter.textDocumentUndoRedoEnabled: root.undoRedoEnabled
+
+        LanguageTransliterator.popup: LanguageTransliteratorPopup {
+            editorFont: _textArea.font
+        }
+        LanguageTransliterator.option: Runtime.language.activeTransliterationOption
+        LanguageTransliterator.enabled: !readOnly
+
+        persistentSelection: _contextMenu.visible || _spellCheckMenu.active
+
+        ContextMenuEvent.onPopup: (mouse) => {
+            if(!_textArea.activeFocus)
+                _textArea.forceActiveFocus()
+
+            if(_textArea.selectedText === "")
+                _textArea.cursorPosition = _textArea.positionAt(mouse.x, mouse.y)
+
+            if(_textArea.activeFocus) {
+                if(_textArea.selectedText === "" && _spellChecker.wordUnderCursorIsMisspelled) {
+                    _spellCheckMenu.spellingSuggestions = _spellChecker.spellingSuggestionsForWordUnderCursor
+                    _spellCheckMenu.popup()
+                } else
+                    _contextMenu.popup()
+            }
+        }
+
+        TabSequenceItem.manager: root.tabSequenceManager
+        TabSequenceItem.enabled: root.tabSequenceEnabled
+        TabSequenceItem.sequence: root.tabSequenceIndex
+
+        readOnly: Scrite.document.readOnly
+        background: Item { }
+
+        SpecialSymbolsSupport {
+            anchors.top: parent.bottom
+            anchors.left: parent.left
+            textEditor: _textArea
+            textEditorHasCursorInterface: true
+            enabled: !Scrite.document.readOnly
+        }
+
+        ActionHandler {
+            action: ActionHub.editOptions.find("undo")
+            enabled: !_textArea.readOnly && _textArea.activeFocus && root.undoRedoEnabled && _textArea.canUndo
+
+            onTriggered: () => { _textArea.undo() }
+        }
+
+        ActionHandler {
+            action: ActionHub.editOptions.find("redo")
+            enabled: !_textArea.readOnly && _textArea.activeFocus && root.undoRedoEnabled && _textArea.canRedo
+
+            onTriggered: () => { _textArea.redo() }
+        }
+
+        SpellingSuggestionsMenu {
+            id: _spellCheckMenu
+
+            property int cursorPosition: -1
+
+            onMenuAboutToShow: () => {
+                                   cursorPosition = _spellChecker.cursorPosition
+                               }
+
+            onMenuAboutToHide: () => {
+                                   _textArea.forceActiveFocus()
+                                   _textArea.cursorPosition = cursorPosition
+                               }
+
+            onReplaceRequest: (suggestion) => {
+                                  if(cursorPosition >= 0) {
+                                      _spellChecker.replaceWordAt(cursorPosition, suggestion)
+                                      _textArea.cursorPosition = cursorPosition
+                                  }
+                              }
+
+            onAddToDictionaryRequest: () => {
+                                          _spellChecker.addWordAtPositionToDictionary(cursorPosition)
+                                      }
+
+            onAddToIgnoreListRequest: () => {
+                                          _spellChecker.addWordAtPositionToIgnoreList(cursorPosition)
+                                      }
+        }
+
+        onCursorRectangleChanged: {
+            let cr = cursorRectangle
+            cr = Qt.rect(cr.x, cr.y-4, cr.width, cr.height+8)
+
+            let cy = root.contentY
+            let ch = root.height
+            if(cr.y < cy)
+                cy = Math.max(cr.y, 0)
+            else if(cr.y + cr.height > cy + ch)
+                cy = Math.min(cr.y + cr.height - ch, height-ch)
+            else
+                return
+            root.contentY = cy
+        }
+
+        onTextEdited: root.textEdited()
+        onEditingFinished: root.editingFinished()
+    }
+
+    VclMenu {
+        id: _contextMenu
+
+        VclMenuItem {
+            text: "Cut\t" + ActionHub.editOptions.find("cut").shortcut
+            enabled: _textArea.selectedText !== ""
+            onClicked: _textArea.cut()
+            focusPolicy: Qt.NoFocus
+        }
+
+        VclMenuItem {
+            text: "Copy\t" + ActionHub.editOptions.find("copy").shortcut
+            enabled: _textArea.selectedText !== ""
+            onClicked: _textArea.copy()
+            focusPolicy: Qt.NoFocus
+        }
+
+        VclMenuItem {
+            text: "Paste\t" + ActionHub.editOptions.find("paste").shortcut
+            onClicked: _textArea.paste()
+            focusPolicy: Qt.NoFocus
+        }
+    }
+}

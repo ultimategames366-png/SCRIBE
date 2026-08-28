@@ -1,0 +1,140 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+Item {
+    id: root
+
+    property int currentTab: -1
+    property var tabs: []
+    property string name: "Tabs"
+    property alias spacing: _tabsRow.spacing
+    property alias switchTabHandlerEnabled: _switchTabActionHandler.enabled
+
+    height: implicitHeight
+    implicitHeight: _tabsRow.height + Runtime.idealFontMetrics.descent + _currentTabUnderline.height
+
+    ActionHandler {
+        id: _switchTabActionHandler
+
+        property int nextIndex: (root.currentTab+1)%_tabsRepeater.count
+        property string text: "Switch to <b>" + _tabsRepeater.itemAt(nextIndex).text + "</b> tab in <i>" + root.name + "</i>"
+
+        enabled: false
+        action: ActionHub.applicationOptions.find("tabRight")
+        onTriggered: root.currentTab = (root.currentTab+1)%_tabsRepeater.count
+    }
+
+    ActionHandler {
+        property int previousIndex: (root.currentTab-1) < 0 ? _tabsRepeater.count-1 : root.currentTab-1
+        property string text: "Switch to <b>" + _tabsRepeater.itemAt(previousIndex).text + "</b> tab in <i>" + root.name + "</i>"
+
+        enabled: _switchTabActionHandler.enabled
+        action: ActionHub.applicationOptions.find("tabLeft")
+        onTriggered: root.currentTab = previousIndex
+    }
+
+    Row {
+        id: _tabsRow
+
+        width: parent.width
+
+        spacing: 16
+
+        VclLabel {
+            id: _nameText
+
+            rightPadding: 10
+
+            text: root.name + ": "
+
+            font.bold: true
+            font.family: Runtime.idealFontMetrics.font.family
+            font.pointSize: Runtime.idealFontMetrics.font.pointSize
+            font.capitalization: Font.AllUppercase
+        }
+
+        Repeater {
+            id: _tabsRepeater
+
+            model: root.tabs
+
+            delegate: VclLabel {
+                id: _tabDelegate
+
+                required property int index
+                required property var modelData
+
+                color: root.currentTab === index ? Runtime.colors.accent.c900.background : Runtime.colors.primary.c700.background
+                font: Runtime.idealFontMetrics.font
+                text: modelData
+
+                MouseArea {
+                    anchors.fill: parent
+
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: root.currentTab = _tabDelegate.index
+                }
+            }
+        }
+    }
+
+    ItemPositionMapper {
+        id: _currentTabItemPositionMapper
+
+        from: _tabsRepeater.count > 0 && root.currentTab >= 0 && root.currentTab < _tabsRepeater.count ? _tabsRepeater.itemAt(root.currentTab) : null
+        to: root
+
+        onMappedPositionChanged: Qt.callLater( function() { _currentTabUnderline.placedOnce = true } )
+    }
+
+    Rectangle {
+        id: _currentTabUnderline
+
+        property bool placedOnce: false
+
+        anchors.top: _tabsRow.bottom
+        anchors.topMargin: Runtime.idealFontMetrics.descent
+
+        height: 2
+        width: _currentTabItemPositionMapper.from ? _currentTabItemPositionMapper.from.width : 2
+
+        x: _currentTabItemPositionMapper.mappedPosition.x
+
+        color: Runtime.colors.accent.c900.background
+        visible: _currentTabItemPositionMapper.from !== null
+
+        Behavior on x {
+            enabled: _currentTabUnderline.placedOnce && Runtime.applicationSettings.enableAnimations
+            NumberAnimation { duration: 100 }
+        }
+
+        Behavior on width {
+            enabled: _currentTabUnderline.placedOnce && Runtime.applicationSettings.enableAnimations
+            NumberAnimation { duration: 100 }
+        }
+    }
+}
+

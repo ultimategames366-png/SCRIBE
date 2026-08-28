@@ -1,0 +1,50 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+
+Item {
+    id: root
+
+    property bool forDarkBackground: false
+
+    property alias running: root.visible
+
+    height: 48
+    width: 48
+
+    visible: false
+
+    Image {
+        id: _image
+
+        anchors.fill: parent
+
+        mipmap: true
+        smooth: true
+        fillMode: Image.PreserveAspectFit
+        source: root.forDarkBackground ? "image://icon/dark/qrc:/icons/content/time.png" : Runtime.themedIcon("qrc:/icons/content/time.png")
+
+        RotationAnimator {
+            duration: 500
+            from: 0
+            loops: Animation.Infinite
+            running: root.running
+            target: _image
+            to: 360
+        }
+    }
+}

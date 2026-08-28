@@ -1,0 +1,77 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+VclMenu {
+    id: root
+
+    required property ActionManager actionManager
+
+    title: actionManager ? actionManager.title : ""
+    closePolicy: Popup.CloseOnEscape|Popup.CloseOnPressOutside
+    font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+    // Repeater doesn't seem to work in cases where the order of the actions
+    // change for whatever reason. They also don't work if actions are added
+    // or removed dynamically. So, its important that we recreate the entire
+    // menu from ground up.
+    //
+    // This also means that you should never alter this menu by yourself in any
+    // case.
+
+    Repeater {
+        id: _menuItems
+
+        model: root.actionManager ? root.actionManager.visibleActions : 0
+
+        delegate: VclMenuItem {
+            id: _menuItem
+
+            required property int index
+            required property var modelData
+
+            property var qmlAction: modelData
+
+            action: qmlAction
+            focusPolicy: Qt.NoFocus
+            opacity: enabled ? 1 : 0.5
+
+            icon.source: action.icon.source !== undefined ? Runtime.themedIcon(action.icon.source) : ""
+
+            font.pointSize: Runtime.idealFontMetrics.font.pointSize
+            icon.color: action.icon.color
+
+            // We need a better way to show shortcuts. This is not going to work!
+
+            ToolTipPopup {
+                container: _menuItem
+
+                text: _menuItem.qmlAction.tooltip !== undefined ? _menuItem.qmlAction.tooltip : ""
+                visible: text !== "" && _menuItem.hovered
+            }
+        }
+
+        onCountChanged: Qt.callLater(root.determineWidth)
+    }
+}

@@ -1,0 +1,531 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+
+import "../../globals"
+import "../../dialogs"
+import "../../helpers"
+import "../../controls"
+import ".."
+
+Rectangle {
+    id: root
+
+    // These come from the model (either Screenplay or ScreenplayAdapter)
+    required property int index
+    required property int breakType
+    required property int screenplayElementType
+    required property var modelData
+    required property Scene scene
+    required property ScreenplayElement screenplayElement
+
+    // These are additional
+    required property bool readOnly
+    required property bool viewHasFocus
+    required property real leftPadding
+    required property real rightPadding
+    required property real leftPaddingRatio
+    required property real sceneIconSize
+    required property real sceneIconPadding
+
+    required property string dragDropMimeType
+
+    required property ScreenplayAdapter screenplayAdapter
+
+    signal clicked()
+    signal dragStarted()
+    signal doubleClicked()
+    signal dragFinished(var dropAction) // When we move to Qt 6.9+, change type to DropAction
+    signal dropEntered(var drag) // When we move to Qt 6.9+, change type to DragEvent
+    signal dropExited()
+    signal dropRequest(var drop) // When we move to Qt 6.9+, change type to DragEvent
+    signal contextMenuRequest()
+    signal collapseSideListPanelRequest()
+
+    Drag.active: _mouseArea.drag.active
+    Drag.source: root.screenplayElement
+    Drag.dragType: Drag.Automatic
+    Drag.supportedActions: Qt.MoveAction
+    Drag.mimeData: _private.dragMimeData
+    Drag.onDragStarted: {
+        if(!root.screenplayElement.selected && root.screenplayAdapter.isSourceScreenplay)
+           root.screenplayAdapter.screenplay.clearSelection()
+        root.screenplayElement.selected = true
+        if(root.screenplayElementType === ScreenplayElement.BreakElementType)
+            root.screenplayAdapter.currentIndex = index
+        root.dragStarted()
+    }
+    Drag.onDragFinished: (dropAction) => { root.dragFinished(dropAction) }
+
+    height: _mainLayout.height
+
+    color: _private.color
+    opacity: _private.multiSelection ? (_private.isSelection ? 1 : 0.85) : 1
+    border.width: _private.isCurrent && root.viewHasFocus ? 1 : 0
+    border.color: Qt.darker(_private.color, 120)
+
+    ColumnLayout {
+        id: _mainLayout
+
+        width: parent.width
+        spacing: 0
+
+        Loader {
+            Layout.fillWidth: true
+
+            active: root.screenplayElement.pageBreakBefore
+            visible: active
+
+            sourceComponent: PageBreakItem {
+                fullSize: false
+                placement: Qt.TopEdge
+            }
+        }
+
+        Item {
+            Layout.fillWidth: true
+            Layout.minimumHeight: _contentLayout.height + 16
+            Layout.preferredHeight: _contentLayout.height + 16
+
+            Rectangle {
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+
+                width: root.sceneIconPadding * (_private.multiSelection ? (_private.isCurrent ? 0.85 : 0.5) : 0.5)
+
+                color: Runtime.colors.accent.windowColor
+                visible: _private.isSelection
+            }
+
+            SceneTypeImage {
+                id: _sceneTypeImage
+
+                anchors.top: _private.isSceneTextModeHeading ? undefined : _contentLayout.top
+                anchors.left: parent.left
+                anchors.leftMargin: root.sceneIconPadding
+                anchors.verticalCenter: _private.isSceneTextModeHeading ? _contentLayout.verticalCenter : undefined
+
+                width: root.sceneIconSize
+                height: root.sceneIconSize
+
+                visible: root.leftPaddingRatio > 0
+                opacity: (_private.isCurrent ? 1 : 0.5) * root.leftPaddingRatio
+                sceneType: root.scene ? root.scene.type : Scene.Standard
+                showTooltip: false
+                lightBackground: Color.isLight(root.color)
+            }
+
+            RowLayout {
+                id: _contentLayout
+
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.leftPadding
+                anchors.rightMargin: root.rightPadding
+                anchors.verticalCenter: parent.verticalCenter
+
+                spacing: 5
+
+                Loader {
+                    Layout.alignment: _label.lineCount === 1 ? Qt.AlignVCenter : Qt.AlignTop
+                    Layout.preferredWidth: root.sceneIconSize
+                    Layout.preferredHeight: root.sceneIconSize
+
+                    active: !_private.isBreak && !root.screenplayElement.omitted &&
+                            Runtime.screenplayEditorSettings.longSceneWarningEnabled &&
+                            root.scene.wordCount > Runtime.screenplayEditorSettings.longSceneWordTreshold
+                    visible: active
+
+                    sourceComponent: Image {
+                        smooth: true
+                        mipmap: true
+                        source: Runtime.themedIcon("qrc:/icons/content/warning.png")
+                        fillMode: Image.PreserveAspectFit
+
+                        MouseArea {
+                            id: _warningMouseArea
+                            anchors.fill: parent
+
+                            hoverEnabled: enabled
+
+                            ToolTipPopup {
+                                text: "" + root.scene.wordCount + " words (limit: " + Runtime.screenplayEditorSettings.longSceneWordTreshold + ").\nRefer Settings > Screenplay > Options tab."
+                                visible: _warningMouseArea.containsMouse
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    Layout.alignment: _label.lineCount === 1 ? Qt.AlignVCenter : Qt.AlignTop
+                    Layout.preferredWidth: Runtime.idealFontMetrics.height
+                    Layout.preferredHeight: Runtime.idealFontMetrics.height
+
+                    z: 1
+                    visible: !_private.isBreak && !root.scene.structureElement.stackLeader && root.scene.structureElement.stackId !== ""
+
+                    Image {
+                        anchors.fill: parent
+
+                        source: Runtime.themedIcon("qrc:/icons/navigation/arrow_right.png")
+                        fillMode: Image.PreserveAspectFit
+                    }
+
+                    MouseArea {
+                        id: _stackHintMouseArea
+                        anchors.fill: parent
+
+                        hoverEnabled: true
+
+                        ToolTipPopup {
+                            text: {
+                                let ret = "This scene is part of a sequence and will be displayed as part of a stack on the structure canvas."
+                                if(!Runtime.screenplayTracksSettings.displayStacks)
+                                    ret += " Toggle 'Display Stacks' option ON to see them in the scene list panel."
+                                return ret
+                            }
+                            visible: _stackHintMouseArea.containsMouse
+                        }
+                    }
+                }
+
+                VclLabel {
+                    id: _label
+
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+
+                    text: _private.text
+                    elide: _private.isSceneTextModeHeading ? Text.ElideMiddle : Text.ElideRight
+                    color: Color.textColorFor(_private.color)
+                    wrapMode: _private.isSceneTextModeHeading ? Text.NoWrap : Text.WrapAtWordBoundaryOrAnywhere
+                    maximumLineCount: _private.isSceneTextModeHeading ? 1 : Runtime.bounded(1,Runtime.screenplayEditorSettings.slpSynopsisLineCount,5)
+                    verticalAlignment: Qt.AlignVCenter
+                    horizontalAlignment: Qt.AlignLeft
+
+                    font.bold: _private.isCurrent || _private.isBreak
+                    font.family: Runtime.sceneEditorFontMetrics.font.family
+                    // font.pointSize: Math.ceil(Runtime.idealFontMetrics.font.pointSize*(delegateItem.elementIsBreak ? 1.2 : 1))
+                    font.capitalization: _private.isBreak || _private.isSceneTextModeHeading ? Font.AllUppercase : Font.MixedCase
+
+                    MouseArea {
+                        id: _labelMouseArea
+
+                        anchors.fill: parent
+
+                        enabled: Runtime.sceneListPanelSettings.showTooltip
+                        hoverEnabled: true
+
+                        ToolTipPopup {
+                            text: _private.tooltipText
+                            parseShortcutInText: false
+                            visible: _labelMouseArea.containsMouse
+                        }
+                    }
+                }
+
+                Loader {
+                    Layout.alignment: _label.lineCount === 1 ? Qt.AlignVCenter : Qt.AlignTop
+                    Layout.preferredWidth: root.sceneIconSize
+                    Layout.preferredHeight: root.sceneIconSize
+
+                    active: !_private.isBreak && !root.scene.hasContent
+                    visible: active
+
+                    sourceComponent: Image {
+                        smooth: true
+                        mipmap: true
+                        source: Runtime.themedIcon("qrc:/icons/content/empty_scene.png")
+                        fillMode: Image.PreserveAspectFit
+
+                        MouseArea {
+                            ToolTip.text: "This scene is empty."
+                            ToolTip.visible: containsMouse
+
+                            anchors.fill: parent
+
+                            enabled: parent.visible
+                            hoverEnabled: enabled
+                        }
+                    }
+                }
+
+                VclLabel {
+                    Layout.alignment: _label.lineCount === 1 ? Qt.AlignVCenter : Qt.AlignTop
+
+                    text: _private.sceneLengthWatcher.sceneLength
+                    color: Color.textColorFor(_private.color)
+                    opacity: _private.isBreak ? 0.75 : 0.5
+
+                    font.bold: _private.isBreak
+                    font.pointSize: Runtime.idealFontMetrics.font.pointSize-3
+                }
+            }
+        }
+
+        Loader {
+            Layout.fillWidth: true
+
+            visible: active
+            active: root.screenplayElement.pageBreakAfter
+
+            sourceComponent: PageBreakItem {
+                fullSize: false
+                placement: Qt.BottomEdge
+            }
+        }
+    }
+
+    MouseArea {
+        id: _mouseArea
+
+        anchors.fill: parent
+
+        preventStealing: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+        drag.axis: Drag.YAxis
+        drag.target: root.screenplayAdapter.isSourceScreenplay && !root.readOnly ? parent : null
+
+        onDoubleClicked: (mouse) => {
+                             root.doubleClicked()
+
+                             root.screenplayAdapter.screenplay.clearSelection()
+                             root.screenplayElement.toggleSelection()
+                             root.screenplayAdapter.currentIndex = root.index
+                             root.collapseSideListPanelRequest()
+                         }
+
+        onClicked: (mouse) => {
+                       root.clicked()
+
+                       if(mouse.button === Qt.RightButton) {
+                           root.screenplayAdapter.currentIndex = root.index
+                           root.contextMenuRequest()
+                           return
+                       }
+
+                       if(root.screenplayAdapter.isSourceScreenplay) {
+                           const isShiftPressed = mouse.modifiers & Qt.ShiftModifier
+                           const isControlPressed = mouse.modifiers & Qt.ControlModifier
+                           if(isControlPressed) {
+                               root.screenplayElement.toggleSelection()
+                           } else if(isShiftPressed) {
+                               const fromIndex = Math.min(root.screenplayAdapter.currentIndex, root.index)
+                               const toIndex = Math.max(root.screenplayAdapter.currentIndex, root.index)
+                               if(fromIndex === toIndex) {
+                                   root.screenplayElement.toggleSelection()
+                               } else {
+                                   for(let i=fromIndex; i<=toIndex; i++) {
+                                       let element = root.screenplayAdapter.screenplay.elementAt(i)
+                                       if(element.elementType === ScreenplayElement.SceneElementType) {
+                                           element.selected = true
+                                       }
+                                   }
+                               }
+                           } else {
+                               root.screenplayAdapter.screenplay.clearSelection()
+                               root.screenplayElement.toggleSelection()
+                           }
+                       }
+
+                       root.screenplayAdapter.currentIndex = root.index
+                   }
+    }
+
+    DropArea {
+        id: _dropArea
+
+        anchors.fill: parent
+
+        keys: [root.dragDropMimeType]
+        enabled: !root.screenplayElement.selected && !root.readOnly
+
+        onEntered: (drag) => {
+                       drag.acceptProposedAction()
+                       root.dropEntered(drag)
+                   }
+
+        onExited: root.dropExited()
+
+        onDropped: (drop) => {
+                       root.dropRequest(drop)
+                       drop.acceptProposedAction()
+                   }
+    }
+
+    Rectangle {
+        id: _dropIndicator
+
+        width: parent.width
+        height: 2
+
+        color: Runtime.colors.primary.borderColor
+        visible: _dropArea.containsDrag
+    }
+
+    /**
+    Rectangle {
+        anchors.top: _dropIndicator.visible ? _dropIndicator.bottom : parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+
+        height: 1
+
+        color: _private.isEpisodeBreak ? Runtime.colors.accent.c200.background : Runtime.colors.accent.c100.background
+        visible: _private.isBreak
+    }
+    */
+
+    QtObject {
+        id: _private
+
+        property bool multiSelection: root.screenplayAdapter.screenplay.selectedElementsCount > 1
+
+        property bool isBreak: root.screenplayElementType === ScreenplayElement.BreakElementType
+        property bool isCurrent: root.screenplayAdapter.currentIndex === root.index
+        property bool isSelection: (isCurrent || root.screenplayElement.selected)
+        property bool isEpisodeBreak: root.screenplayElementType === ScreenplayElement.BreakElementType && root.breakType === Screenplay.Episode
+        property bool isSceneTextModeHeading: Runtime.sceneListPanelSettings.sceneTextMode === "HEADING"
+
+        property color color: isSelection ? selectedColor : normalColor
+        property color normalColor: root.scene ? Runtime.colors.tintTx(delegateColor, Runtime.colors.sceneHeadingTint) : Qt.lighter(delegateColor, 1.25)
+        property color selectedColor: root.scene ? Runtime.colors.tintTx(delegateColor, Runtime.colors.selectedSceneHeadingTint) : delegateColor
+
+        property string tooltipText: {
+            if(root.screenplayElement.breakType === Screenplay.Interval)
+                return "Interval Break"
+
+            const lengthMode = Runtime.sceneListPanelSettings.displaySceneLength
+            const starts = "<b>Starts</b> " + TMath.timeLengthString(sceneLengthWatcher.timeOffset) +
+                           " on Pg. " + (1+Math.floor(_private.sceneLengthWatcher.pageOffset))
+            const pgCount = "<b>Length</b> " + sceneLengthWatcher.pageLength.toFixed(2) + " or " + sceneLengthWatcher.pageLength1_8 + " pages"
+            const duration = "<b>Duration</b> " + TMath.timeLengthString(sceneLengthWatcher.timeLength)
+            let fields = []
+            if(isBreak) {
+                const idxList = Scrite.document.screenplay.sceneElementsInBreak(root.screenplayElement)
+                if(idxList.length === 1)
+                    fields.push("Has 1 scene")
+                else
+                    fields.push("Has " + idxList.length + " scenes")
+            }
+            fields.push(starts)
+            if(lengthMode === "PAGE" || lengthMode === "")
+                fields.push(duration)
+            if(lengthMode === "TIME" || lengthMode === "")
+                fields.push(pgCount)
+
+            const bullets = SMath.formatAsBulletPoints(fields)
+            if(_label.truncated)
+                return "&nbsp;" + "<p>" + _label.text + "</p>" + bullets;
+            return "&nbsp;" + bullets
+        }
+
+        property SceneHeading sceneHeading: root.scene ? root.scene.heading : null
+
+        property color delegateColor: {
+            if(root.scene)
+                return root.scene.color
+            if(isEpisodeBreak)
+                return Runtime.colors.accent.c300.background
+            return Runtime.colors.accent.c200.background
+        }
+
+        property var dragMimeData: {
+            let ret = {}
+            ret[root.dragDropMimeType] = root.screenplayElement.sceneID
+            return ret
+        }
+
+        property string text: {
+            let ret = "UNKNOWN"
+
+            if(root.scene) {
+                if(isSceneTextModeHeading) {
+                    if(sceneHeading.enabled) {
+                        ret = root.screenplayElement.resolvedSceneNumber + ". "
+                        if(root.screenplayElement.omitted)
+                            ret += "[OMITTED] <font color=\"gray\">" + root.scene.heading.text + "</font>"
+                        else
+                            ret += sceneHeading.displayText
+                    } else if(root.screenplayElement.omitted)
+                        ret = "[OMITTED]"
+                    else
+                        ret = "NO SCENE HEADING"
+                } else {
+                    let summary = root.scene.summary
+                    if(sceneHeading.enabled) {
+                        ret = root.screenplayElement.resolvedSceneNumber + ". "
+                        if(root.screenplayElement.omitted)
+                            ret += "[OMITTED] <font color=\"gray\">" + summary + "</font>"
+                        else
+                            ret += summary
+                    } else if(root.screenplayElement.omitted)
+                        ret = "[OMITTED]" + summary
+                    else
+                        ret = summary
+                }
+
+                return ret
+            }
+
+            if(isBreak) {
+                if(isEpisodeBreak)
+                    ret = root.screenplayElement.breakTitle
+                else if(root.screenplayAdapter.isSourceScreenplay && root.screenplayAdapter.screenplay.episodeCount > 1)
+                    ret = "Ep " + (root.screenplayElement.episodeIndex+1) + ": " + root.screenplayElement.breakTitle
+                else
+                    ret = root.screenplayElement.breakTitle
+                if(root.screenplayElement.breakSubtitle !== "")
+                    ret +=  ": " + root.screenplayElement.breakSubtitle
+                return ret
+            }
+
+            return ret
+        }
+
+        readonly property ScreenplayPaginatorWatcher sceneLengthWatcher: ScreenplayPaginatorWatcher {
+            property string sceneLength: {
+                if(paginator === null || element === null || !hasValidRecord)
+                    return ""
+
+                if(Runtime.sceneListPanelSettings.displaySceneLength === "TIME")
+                    return TMath.timeLengthString(timeLength)
+
+                if(Runtime.sceneListPanelSettings.displaySceneLength === "PAGE")
+                    return pageLength.toFixed(2)
+
+                if(Runtime.sceneListPanelSettings.displaySceneLength === "PAGE_1_8")
+                    return pageLength1_8
+
+                return ""
+            }
+
+            paginator: Runtime.paginator.paused || Runtime.sceneListPanelSettings.displaySceneLength === "NO" ? null : Runtime.paginator
+            element: root.screenplayElement
+        }
+    }
+}

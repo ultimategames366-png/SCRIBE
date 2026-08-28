@@ -1,0 +1,317 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../"
+import "../../globals"
+import "../../helpers"
+import "../../controls"
+
+FocusScope {
+    id: root
+
+    property real availableHeight: 500
+    property alias lookup: _filterText.text
+
+    Component.onCompleted: {
+        forceActiveFocus()
+        if(_filterText.text !== "") {
+            _actionsModel.filter()
+            if(_actionsView.count === 1) {
+                _actionsView.itemAtIndex(0).editShortcut()
+            }
+        }
+    }
+
+    height: availableHeight
+
+    focus: true
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 11
+
+        RowLayout {
+            Layout.fillWidth: true
+
+            TextField {
+                id: _filterText
+
+                Layout.fillWidth: true
+
+                Keys.onUpPressed: _actionsView.currentIndex = Math.max(_actionsView.currentIndex-1,0)
+                Keys.onDownPressed: _actionsView.currentIndex = Math.min(_actionsView.currentIndex+1, _actionsView.count-1)
+                Keys.onEnterPressed: _actionsView.editCurrentItem()
+                Keys.onReturnPressed: _actionsView.editCurrentItem()
+
+                focus: true
+                placeholderText: "Filter by name"
+
+                onTextEdited: _actionsModel.filter()
+            }
+
+            ToolButton {
+                flat: true
+
+                ToolTip.text: _filterText.text === "" ? "Restore default shortcuts to all" : "Restore default shortcuts to the filtered list displayed below"
+                ToolTip.delay: Scrite.app.styleHints.mousePressAndHoldInterval
+                ToolTip.visible: hovered
+
+                icon.source: Runtime.themedIcon("qrc:/icons/content/undo.png")
+
+                onClicked: {
+                    const restoreCount = _actionsModel.restoreAllActionShortcuts()
+                    if(restoreCount > 0) {
+                        MessageBox.information("Shortcuts Restored",
+                                               "Default shortcut was restored on " + restoreCount + " action(s).")
+                    } else {
+                        MessageBox.information("None Required",
+                                               "All actions already have default shortcuts.")
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            color: Runtime.colors.primary.c10.background
+            border.width: 1
+            border.color: Runtime.colors.primary.borderColor
+
+            ListView {
+                id: _actionsView
+
+                function resetCurrentItem() {
+                    currentIndex = count > 0 ? 0 : -1
+                }
+
+                function editCurrentItem() {
+                    if(currentItem != null) {
+                        currentItem.editShortcut()
+                    }
+                }
+
+                anchors.fill: parent
+                anchors.margins: 1
+
+                ScrollBar.vertical: VclScrollBar { }
+
+                FlickScrollSpeedControl.factor: Runtime.workspaceSettings.flickScrollSpeedFactor
+
+                boundsBehavior: Flickable.StopAtBounds
+                boundsMovement: ListView.StopAtBounds
+                clip: true
+                highlightFollowsCurrentItem: true
+                highlightMoveDuration: 0
+                highlightResizeDuration: 0
+                keyNavigationEnabled: false
+                model: _actionsModel
+
+                section.property: "groupName"
+                section.criteria: ViewSection.FullString
+                section.labelPositioning: ViewSection.InlineLabels
+                section.delegate: VclLabel {
+                    required property string section
+
+                    width: _actionsView.width
+
+                    text: section
+                    color: Runtime.colors.accent.c100.text
+                    padding: 12
+
+                    font.bold: true
+
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignLeft
+
+                    background: Rectangle {
+                        color: Runtime.colors.accent.c100.background
+                    }
+                }
+
+                delegate: Item {
+                    id: _delegate
+
+                    required property int index
+                    required property var qmlAction
+                    required property var actionManager
+                    required property bool shortcutIsEditable
+                    required property string groupName
+
+                    function editShortcut() {
+                        _shortcutField.editShortcut()
+                    }
+
+                    width: _actionsView.height < _actionsView.contentHeight ? _actionsView.width - 17 : _actionsView.width
+                    height: _delegateLayout.height
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        onClicked: _actionsView.currentIndex = _delegate.index
+                    }
+
+                    RowLayout {
+                        id: _delegateLayout
+
+                        width: parent.width
+
+                        Image {
+                            Layout.alignment: _descriptionLabel.visible ? Qt.AlignTop : Qt.AlignVCenter
+                            Layout.topMargin: _descriptionLabel.visible ? 10 : 0
+                            Layout.leftMargin: 12
+                            Layout.preferredHeight: _nameLabel.height * 0.5
+                            Layout.preferredWidth: _nameLabel.height * 0.5
+
+                            fillMode: Image.PreserveAspectFit
+                            source: _delegate.qmlAction.icon.source !== "" ? Runtime.themedIcon(_delegate.qmlAction.icon.source) : Runtime.themedIcon("qrc:/icons/content/blank.png")
+                        }
+
+                        ColumnLayout {
+                            Layout.alignment: _descriptionLabel.visible ? Qt.AlignTop : Qt.AlignVCenter
+                            Layout.fillWidth: true
+
+                            spacing: 0
+
+                            VclText {
+                                id: _nameLabel
+
+                                Layout.fillWidth: true
+
+                                bottomPadding: _descriptionLabel.visible ? 2 : 10
+                                padding: 10
+
+                                color: Runtime.colors.primary.editor.text
+                                elide: Text.ElideRight
+                                font: Runtime.idealFontMetrics.font
+                                text: _delegate.qmlAction.text + (_delegate.qmlAction.checkable & _delegate.qmlAction.checked ? " ✔" : "")
+                            }
+
+                            VclLabel {
+                                id: _descriptionLabel
+
+                                Layout.fillWidth: true
+                                Layout.leftMargin: 10
+                                Layout.rightMargin: 10
+                                Layout.bottomMargin: 10
+
+                                color: Runtime.colors.primary.editor.text
+                                opacity: 0.6
+
+                                elide: Text.ElideRight
+                                font: Runtime.minimumFontMetrics.font
+                                maximumLineCount: 3
+                                text: _delegate.qmlAction.tooltip !== undefined ? _delegate.qmlAction.tooltip.trim() : ""
+                                visible: text !== ""
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        ShortcutField {
+                            id: _shortcutField
+
+                            Layout.alignment: Qt.AlignTop
+                            Layout.topMargin: 10
+                            Layout.preferredWidth: _delegateLayout.width * 0.3
+
+                            enabled: _delegate.shortcutIsEditable
+                            opacity: enabled ? 1 : 0.5
+                            description: "Shortcut for <b>" + _delegate.actionManager.title + "</b> » <i>" + _delegate.qmlAction.text + "</i>"
+                            portableShortcut: _delegate.qmlAction.shortcut !== undefined ? _delegate.qmlAction.shortcut : ""
+                            placeholderText: _delegate.qmlAction.defaultShortcut !== undefined && _delegate.qmlAction.defaultShortcut !== "" ?
+                                                 ("Default: " + Gui.nativeShortcut(_delegate.qmlAction.defaultShortcut)) :
+                                                 (_delegate.qmlAction.allowShortcut === true ? "None Set" : "")
+
+                            onActiveFocusChanged: {
+                                if(activeFocus) {
+                                    _actionsView.currentIndex = _delegate.index
+                                }
+                            }
+
+                            onShortcutEdited: (newShortcut) => {
+                                                  ActionHub.assignShortcut(_delegate.qmlAction, newShortcut)
+                                              }
+                        }
+
+                        ToolButton {
+                            flat: true
+
+                            enabled: visible && _delegate.shortcutIsEditable && Gui.nativeShortcut(_delegate.qmlAction.defaultShortcut) !== Gui.nativeShortcut(_delegate.qmlAction.shortcut)
+                            opacity: enabled ? 1 : (_delegate.shortcutIsEditable ? 0.5 : 0)
+                            icon.source: Runtime.themedIcon("qrc:/icons/content/undo.png")
+
+                            onClicked: {
+                                _actionsModel.restoreActionShortcut(_delegate.qmlAction)
+                            }
+                        }
+                    }
+                }
+
+                highlight: Rectangle {
+                    color: Runtime.colors.primary.highlight.background
+                }
+            }
+        }
+
+    }
+
+    ActionsModelFilter {
+        id: _actionsModel
+
+        filters: ActionsModelFilter.ShortcutsEditorFilters
+        customFilterMode: true
+
+        onFilterRequest: (qmlAction, actionManager, result) => {
+                             if(_filterText.length === 0) {
+                                 result.value = true
+                             } else {
+                                 const givenText = _filterText.text.toLowerCase()
+
+                                 let text = (actionManager.title + ": " + qmlAction.text)
+                                 if(qmlAction.keywords !== undefined) {
+                                     if(typeof qmlAction.keywords === "string")
+                                     text += ", " + qmlAction.keywords
+                                     else if(qmlAction.keywords.length > 0)
+                                     text += ", " + qmlAction.keywords.join(", ")
+                                 }
+                                 if(qmlAction.tooltip !== undefined) {
+                                     text += ", " + qmlAction.tooltip
+                                 }
+
+                                 text = text.toLowerCase()
+
+                                 result.value = (text.indexOf(givenText) >= 0)
+                             }
+                         }
+
+        onModelReset: Qt.callLater(_actionsView.resetCurrentItem)
+        onRowsRemoved: Qt.callLater(_actionsView.resetCurrentItem)
+        onRowsInserted: Qt.callLater(_actionsView.resetCurrentItem)
+
+        onActionShortcutRestored: (action) => {
+                                      ActionHub.logShortcutChangeActivity(action)
+                                  }
+    }
+}

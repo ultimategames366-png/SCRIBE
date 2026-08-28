@@ -1,0 +1,149 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+import io.scrite.components
+
+import "../globals"
+import "../dialogs"
+import "../controls"
+
+Item {
+    id: root
+
+    required property string description
+    required property string portableShortcut
+
+    property string placeholderText: "None Set"
+    property string nativeShortcut: Gui.nativeShortcut(portableShortcut)
+
+    property bool readOnly: false
+    property font font: fontMetrics.font
+    property FontMetrics fontMetrics: Runtime.shortcutFontMetrics
+
+    property scriteKeyCombinations keyCombinations: Gui.keyCombinations(portableShortcut)
+
+    readonly property string delimiter: " + "
+
+    function editShortcut() {
+        if(enabled)
+            ShortcutInputDialog.launch(portableShortcut, description, shortcutEdited)
+    }
+
+    signal shortcutEdited(string newShortcut)
+
+    implicitWidth: _layout.width
+    implicitHeight: _layout.height
+
+    clip: width < _layout.width
+
+    RowLayout {
+        id: _layout
+
+        anchors.verticalCenter: parent.verticalCenter
+
+        spacing: root.fontMetrics.averageCharacterWidth * 0.4
+
+        opacity: enabled ? 1 : 0.5
+
+        Repeater {
+            id: _modifiers
+
+            model: root.keyCombinations.modifiers
+
+            delegate: KeyboardKey {
+                id: _delegate
+                required property int index
+                required property string modelData
+
+                Layout.alignment: Qt.AlignVCenter
+                Layout.minimumWidth: root.__minimumKeyWidth
+                Layout.minimumHeight: root.__minimumKeyHeight
+
+                text: _delegate.modelData
+            }
+        }
+
+        Repeater {
+            model: root.keyCombinations.keys
+
+            delegate: KeyboardKey {
+                id: _delegate2
+                required property int index
+                required property string modelData
+
+                Layout.alignment: Qt.AlignVCenter
+                Layout.minimumWidth: root.__minimumKeyWidth
+                Layout.minimumHeight: root.__minimumKeyHeight
+
+                text: _delegate2.modelData
+            }
+        }
+
+        Link {
+            Layout.alignment: Qt.AlignVCenter
+
+            text: root.placeholderText
+            font: root.font
+            visible: root.portableShortcut === ""
+        }
+    }
+
+    MouseArea {
+        id: _mouseArea
+
+        anchors.fill: _layout
+
+        enabled: !root.readOnly
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        hoverEnabled: true
+
+        onClicked: root.editShortcut()
+    }
+
+    property real __minimumKeyWidth: fontMetrics.boundingRect("Ctrl").width + 6
+    property real __minimumKeyHeight: fontMetrics.lineSpacing + 4
+
+    component KeyboardKey : Rectangle {
+        property string text
+
+        implicitWidth: _keyText.width
+        implicitHeight: _keyText.height
+
+        color: _mouseArea.containsMouse ? Runtime.colors.primary.c300.background : Runtime.colors.primary.c200.background
+        border.width: enabled ? 1 : 0
+        border.color: Runtime.colors.primary.c700.background
+
+        Text {
+            id: _keyText
+
+            anchors.centerIn: parent
+
+            color: Color.textColorFor(parent.color)
+            font: root.font
+            text: parent.text
+            leftPadding: 3
+            rightPadding: 3
+            topPadding: 2
+            bottomPadding: 2
+        }
+    }
+}

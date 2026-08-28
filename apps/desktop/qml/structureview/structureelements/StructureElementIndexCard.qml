@@ -1,0 +1,956 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../../globals"
+import "../../helpers"
+import "../../dialogs"
+import "../../controls"
+import ".."
+
+AbstractStructureElementUI {
+    id: root
+
+    readonly property alias isEditing: _private.isEditing
+    readonly property alias isSelected: _private.isSelected
+    readonly property alias elementStack: _private.elementStack
+    readonly property alias isBeingDragged: _private.isBeingDragged
+    readonly property alias isStackedOnTop: _private.isStackedOnTop
+
+    property alias isVisibleInViewport: _private.isVisibleInViewport
+
+    signal editorRequest()
+    signal requestContextMenu(StructureElement element)
+    signal resetAnnotationGripRequest()
+
+    Drag.active: _dragHandleMouseArea.drag.active
+    Drag.source: root.element.scene
+    Drag.dragType: Drag.Automatic
+    Drag.hotSpot.x: _private.dragImageSize.width/2 // dragHandle.x + dragHandle.width/2
+    Drag.hotSpot.y: _private.dragImageSize.height/2 // dragHandle.y + dragHandle.height/2
+    Drag.supportedActions: Qt.LinkAction
+
+    Drag.mimeData: {
+        let md = {}
+        md[Runtime.timelineViewSettings.dropAreaKey] = root.element.scene.id
+        return md
+    }
+
+    FocusTracker.window: Scrite.window
+    FocusTracker.objectName: "StructureElementIndexCard"
+    FocusTracker.evaluationMethod: FocusTracker.StandardFocusEvaluation
+    FocusTracker.indicator.target: _private
+    FocusTracker.indicator.property: "isEditing"
+
+    BoundingBoxItem.evaluator: root.canvasItemsBoundingBox
+    BoundingBoxItem.stackOrder: 3.0 + (root.elementIndex/Scrite.document.structure.elementCount)
+    BoundingBoxItem.livePreview: false
+    BoundingBoxItem.viewportRect: root.canvasScrollViewportRect
+    BoundingBoxItem.viewportItem: root.canvasScrollViewport
+    BoundingBoxItem.visibilityMode: _private.isStackedOnTop ? BoundingBoxItem.VisibleUponViewportIntersection : BoundingBoxItem.IgnoreVisibility
+    BoundingBoxItem.previewFillColor: Color.translucent(root.element.scene.color, _private.isSelected ? 0.75 : 0.1)
+    BoundingBoxItem.previewBorderColor: Color.isLight(root.element.scene.color) ? "black" : root.element.scene.color
+    BoundingBoxItem.previewBorderWidth: _private.isSelected ? 3 : 1.5
+    BoundingBoxItem.visibilityProperty: "isVisibleInViewport"
+
+    Component.onCompleted: {
+        root.determineElementStack()
+        root.element.follow = root
+    }
+
+    function select() {
+        Scrite.document.structure.currentElementIndex = root.elementIndex
+    }
+
+    function activate() {
+        root.canvasTabSequence.releaseFocus()
+        Scrite.document.structure.currentElementIndex = root.elementIndex
+
+        root.resetAnnotationGripRequest()
+        root.editorRequest()
+    }
+
+    function finishEditing() {
+        root.canvasTabSequence.releaseFocus()
+    }
+
+    function zoomOneForFocus() {
+        if(root.canvasScaleIsLessForEdit)
+            root.zoomOneToItemRequest(root)
+    }
+
+    function determineElementStack() {
+        if(root.element.stackId === "")
+            _private.elementStack = null
+        else if(_private.elementStack === null || _private.elementStack.stackId !== root.element.stackId)
+            _private.elementStack = Scrite.document.structure.elementStacks.findStackById(root.element.stackId)
+    }
+
+    function confirmAndDeleteSelf() {
+        MessageBox.question("Delete Confirmation",
+                            "Are you sure you want to delete the selelected index card?",
+                            ["Yes", "No"],
+                            (answer) => {
+                                if(answer === "Yes") {
+                                    root.deleteElementRequest(root.element)
+                                }
+                            })
+    }
+
+    x: _positionBinder.get.x
+    y: _positionBinder.get.y
+    z: _private.isSelected ? 1 : 0
+
+    width: 350
+    height: 300 + Scrite.document.structure.indexCardFields.length * 50
+
+    visible: _private.isVisibleInViewport && _private.isStackedOnTop
+
+    Rectangle {
+        id: _background
+
+        property color borderColor: Color.isLight(root.element.scene.color) ? Qt.rgba(0.75,0.75,0.75,1.0) : root.element.scene.color
+
+        anchors.fill: parent
+
+        color: Runtime.colors.tintTx(root.element.scene.color, _private.isSelected ? Runtime.colors.selectedSceneControlTint : Runtime.colors.sceneControlTint)
+        border.width: _private.isSelected ? 2 : 1
+        border.color: _private.isSelected ? borderColor : Qt.lighter(borderColor)
+
+        // Move index-card around
+        MouseArea {
+            id: _moveMouseArea
+
+            anchors.fill: parent
+
+            drag.target: Scrite.document.readOnly || Scrite.document.structure.forceBeatBoardLayout ? null : root
+            drag.axis: Drag.XAndYAxis
+            drag.minimumX: 0
+            drag.minimumY: 0
+            drag.onActiveChanged: {
+                root.canvasActiveFocusRequest()
+                Scrite.document.structure.currentElementIndex = root.elementIndex
+                if(drag.active === false) {
+                    root.x = Scrite.document.structure.snapToGrid(root.x)
+                    root.y = Scrite.document.structure.snapToGrid(root.y)
+                } else
+                    root.element.syncWithFollow = true
+            }
+
+            acceptedButtons: Qt.LeftButton
+
+            onPressed: {
+                root.element.undoRedoEnabled = true
+                root.select()
+                root.canvasActiveFocusRequest()
+            }
+            onReleased: {
+                root.element.undoRedoEnabled = false
+            }
+        }
+
+        // Context menu support for index card
+        MouseArea {
+            anchors.fill: parent
+
+            acceptedButtons: Qt.RightButton
+
+            onClicked: {
+                root.canvasTabSequence.releaseFocus()
+                root.canvasActiveFocusRequest()
+                root.select()
+                root.requestContextMenu(root.element)
+            }
+        }
+    }
+
+    ColumnLayout {
+        id: _indexCardLayout
+
+        readonly property real margin: 7
+
+        anchors.fill: parent
+        anchors.margins: margin
+
+        spacing: 10
+
+        LodLoader {
+            id: _headingFieldLoader
+
+            Layout.fillWidth: true
+
+            TabSequenceItem.enabled: _private.isStackedOnTop
+            TabSequenceItem.manager: root.canvasTabSequence
+            TabSequenceItem.sequence: {
+                const indexes = root.element.scene.screenplayElementIndexList
+                if(indexes.length === 0)
+                    return root.elementIndex * _private.nrFocusFieldCount + 0
+
+                return (indexes[0] + Scrite.document.structure.elementCount) * _private.nrFocusFieldCount + 0
+            }
+            TabSequenceItem.onAboutToReceiveFocus: {
+                Scrite.document.structure.currentElementIndex = root.elementIndex
+                Qt.callLater(maybeAssumeFocus)
+            }
+
+            lod: _private.isSelected && !root.canvasScaleIsLessForEdit ? LodLoader.LOD.High : LodLoader.LOD.Low
+
+            lowDetailComponent: TextEdit {
+                id: _basicHeadingField
+
+                SyntaxHighlighter.delegates: [
+                    LanguageFontSyntaxHighlighterDelegate {
+                        enabled: Runtime.screenplayEditorSettings.useLanguageFonts
+                        defaultFont: _basicHeadingField.font
+                    }
+                ]
+                SyntaxHighlighter.textDocument: textDocument
+
+                text: root.element.hasTitle ? root.element.title : "Index Card Title"
+                color: Color.textColorFor(_background.color)
+                enabled: false
+                readOnly: true
+                opacity: root.element.hasTitle ? 1 : 0.5
+
+                topPadding: 4
+                leftPadding: 4
+                rightPadding: 4
+                bottomPadding: 4
+
+                selectByMouse: false
+                selectByKeyboard: false
+
+                font.bold: true
+                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                // font.capitalization: element.hasNativeTitle ? Font.MixedCase : Font.AllUppercase
+
+                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+            }
+
+            highDetailComponent: VclTextField {
+                id: _headingField
+
+                width: parent.width
+
+                text: root.element.title
+                label: ""
+                enabled: !readOnly
+                readOnly: Scrite.document.readOnly
+                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                maximumLength: 140
+                placeholderText: "Scene Heading / Name"
+                labelAlwaysVisible: true
+                enableTransliteration: true
+
+                topPadding: 4
+                leftPadding: 4
+                rightPadding: 4
+                bottomPadding: 4
+
+                font.bold: true
+                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+                onEditingComplete: { root.element.title = text; TabSequenceItem.focusNext() }
+
+                onActiveFocusChanged: {
+                    if(activeFocus)
+                        root.select()
+                }
+            }
+
+            onItemChanged: Qt.callLater(maybeAssumeFocus)
+            onFocusChanged: Qt.callLater(maybeAssumeFocus)
+
+            function maybeAssumeFocus() {
+                if(focus && lod === LodLoader.LOD.High && item) {
+                    item.selectAll()
+                    item.forceActiveFocus()
+                }
+            }
+        }
+
+        StackLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            currentIndex: Scrite.document.structure.indexCardContent === Structure.Synopsis ? 0 : 1
+
+            ColumnLayout {
+                spacing: 10
+                visible: parent.currentIndex === 0
+
+                LodLoader {
+                    id: _synopsisFieldLoader
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    TabSequenceItem.enabled: _private.isStackedOnTop
+                    TabSequenceItem.manager: root.canvasTabSequence
+                    TabSequenceItem.sequence: {
+                        const indexes = root.element.scene.screenplayElementIndexList
+                        if(indexes.length === 0)
+                            return root.elementIndex * _private.nrFocusFieldCount + 1
+
+                        return (indexes[0] + Scrite.document.structure.elementCount) * _private.nrFocusFieldCount + 1
+                    }
+                    TabSequenceItem.onAboutToReceiveFocus: {
+                        Scrite.document.structure.currentElementIndex = root.elementIndex
+                        Qt.callLater(maybeAssumeFocus)
+                    }
+
+                    lod: _private.isSelected && !root.canvasScaleIsLessForEdit ? LodLoader.LOD.High : LodLoader.LOD.Low
+                    focus: true
+                    sanctioned: parent.visible
+                    resetWidthBeforeLodChange: false
+                    resetHeightBeforeLodChange: false
+
+                    lowDetailComponent: Rectangle {
+                        clip: true
+                        height: _synopsisFieldLoader.height
+                        border.width: _synopsisTextDisplay.truncated ? 1 : 0
+                        border.color: Runtime.colors.primary.borderColor
+                        color: _synopsisTextDisplay.truncated ? Qt.rgba(1,1,1,0.1) : Qt.rgba(0,0,0,0)
+
+                        TextEdit {
+                            id: _synopsisTextDisplay
+
+                            property bool truncated: contentHeight > height
+
+                            anchors.fill: parent
+
+                            SyntaxHighlighter.delegates: [
+                                LanguageFontSyntaxHighlighterDelegate {
+                                    enabled: Runtime.screenplayEditorSettings.useLanguageFonts
+                                    defaultFont: _synopsisTextDisplay.font
+                                },
+
+                                SpellCheckSyntaxHighlighterDelegate {
+                                    enabled: Runtime.screenplayEditorSettings.enableSpellCheck
+                                    cursorPosition: _synopsisTextDisplay.cursorPosition
+                                }
+                            ]
+                            SyntaxHighlighter.textDocument: textDocument
+
+                            topPadding: 4
+                            leftPadding: 4
+                            rightPadding: 4
+                            bottomPadding: 4
+
+                            text: root.element.scene.hasSynopsis ? root.element.scene.synopsis : "Describe what happens in this scene."
+                            color: Color.textColorFor(_background.color)
+                            enabled: false
+                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                            readOnly: true
+                            opacity: root.element.scene.hasSynopsis ? 1 : 0.5
+                            font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+                            selectByMouse: false
+                            selectByKeyboard: false
+                        }
+                    }
+
+                    highDetailComponent: Item {
+                        width: _synopsisFieldLoader.width
+                        height: _synopsisFieldLoader.height
+
+                        function assumeFocus() {
+                            _synopsisField.forceActiveFocus()
+                            _synopsisField.cursorPosition = _synopsisField.length
+                        }
+
+                        Flickable {
+                            id: _synopsisFieldFlick
+
+                            property bool scrollBarVisible: contentHeight > height
+
+                            ScrollBar.vertical: VclScrollBar { flickable: _synopsisFieldFlick }
+
+                            FlickScrollSpeedControl.factor: Runtime.workspaceSettings.flickScrollSpeedFactor
+
+                            clip: true
+                            width: parent.width
+                            height: parent.height-5
+                            interactive: _synopsisField.activeFocus && scrollBarVisible
+                            contentWidth: _synopsisField.width
+                            contentHeight: _synopsisField.height
+                            flickableDirection: Flickable.VerticalFlick
+
+                            TextArea {
+                                id: _synopsisField
+
+                                SyntaxHighlighter.delegates: [
+                                    LanguageFontSyntaxHighlighterDelegate {
+                                        enabled: Runtime.screenplayEditorSettings.useLanguageFonts
+                                        defaultFont: _synopsisField.font
+                                    },
+
+                                    SpellCheckSyntaxHighlighterDelegate {
+                                        id: _spellChecker
+                                        enabled: Runtime.screenplayEditorSettings.enableSpellCheck
+                                        cursorPosition: _synopsisField.cursorPosition
+                                    }
+                                ]
+                                SyntaxHighlighter.textDocument: textDocument
+                                SyntaxHighlighter.textDocumentUndoRedoEnabled: activeFocus
+
+                                LanguageTransliterator.popup: LanguageTransliteratorPopup { }
+                                LanguageTransliterator.option: Runtime.language.activeTransliterationOption
+                                LanguageTransliterator.enabled: !readOnly
+
+                                verticalAlignment: Text.AlignTop
+
+                                persistentSelection: _contextMenu.visible || _spellCheckMenu.active
+
+                                ContextMenuEvent.onPopup: (mouse) => {
+                                    if(!_synopsisField.activeFocus)
+                                        _synopsisField.forceActiveFocus()
+
+                                    if(_synopsisField.selectedText === "")
+                                        _synopsisField.cursorPosition = _synopsisField.positionAt(mouse.x, mouse.y)
+
+                                    if(_synopsisField.activeFocus) {
+                                        if(_synopsisField.selectedText === "" && _spellChecker.wordUnderCursorIsMisspelled) {
+                                            _spellCheckMenu.spellingSuggestions = _spellChecker.spellingSuggestionsForWordUnderCursor
+                                            _spellCheckMenu.popup()
+                                        } else
+                                            _contextMenu.popup()
+                                    }
+                                }
+
+                                width: _synopsisFieldFlick.scrollBarVisible ? _synopsisFieldFlick.width-20 : _synopsisFieldFlick.width
+                                height: Math.max(250, contentHeight + 100)
+
+                                background: Item { }
+
+                                topPadding: 4
+                                leftPadding: 4
+                                rightPadding: 4
+                                bottomPadding: 4
+
+                                selectByMouse: true
+                                selectByKeyboard: true
+
+                                text: root.element.scene.synopsis
+                                readOnly: Scrite.document.readOnly
+                                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+                                onTextEdited: root.element.scene.setSynopsisDirectly(text)
+
+                                onActiveFocusChanged: {
+                                    if(activeFocus)
+                                        root.select()
+                                    else
+                                        root.element.scene.trimSynopsis()
+                                }
+
+                                onCursorRectangleChanged: {
+                                    let y1 = cursorRectangle.y
+                                    let y2 = cursorRectangle.y + cursorRectangle.height
+                                    if(y1 < _synopsisFieldFlick.contentY)
+                                        _synopsisFieldFlick.contentY = Math.max(y1-10, 0)
+                                    else if(y2 > _synopsisFieldFlick.contentY + _synopsisFieldFlick.height)
+                                        _synopsisFieldFlick.contentY = y2+10 - _synopsisFieldFlick.height
+                                }
+
+                                SpecialSymbolsSupport {
+                                    anchors.top: parent.bottom
+                                    anchors.left: parent.left
+                                    textEditor: _synopsisField
+                                    textEditorHasCursorInterface: true
+                                    enabled: !Scrite.document.readOnly
+                                }
+
+                                SpellingSuggestionsMenu {
+                                    id: _spellCheckMenu
+
+                                    property int cursorPosition: -1
+
+                                    onMenuAboutToShow: () => {
+                                                           cursorPosition = _spellChecker.cursorPosition
+                                                       }
+
+                                    onMenuAboutToHide: () => {
+                                                           _synopsisField.forceActiveFocus()
+                                                           _synopsisField.cursorPosition = cursorPosition
+                                                       }
+
+                                    onReplaceRequest: (suggestion) => {
+                                                          if(cursorPosition >= 0) {
+                                                              _spellChecker.replaceWordAt(cursorPosition, suggestion)
+                                                              _synopsisField.cursorPosition = cursorPosition
+                                                          }
+                                                      }
+
+                                    onAddToDictionaryRequest: () => {
+                                                                  _spellChecker.addWordAtPositionToDictionary(cursorPosition)
+                                                              }
+
+                                    onAddToIgnoreListRequest: () => {
+                                                                  _spellChecker.addWordAtPositionToIgnoreList(cursorPosition)
+                                                              }
+                                }
+
+                                VclMenu {
+                                    id: _contextMenu
+
+                                    focus: false
+
+                                    VclMenuItem {
+                                        text: "Cut\t" + ActionHub.editOptions.find("cut").shortcut
+                                        enabled: _synopsisField.selectedText !== ""
+                                        onClicked: _synopsisField.cut()
+                                        focusPolicy: Qt.NoFocus
+                                    }
+
+                                    VclMenuItem {
+                                        text: "Copy\t" + ActionHub.editOptions.find("copy").shortcut
+                                        enabled: _synopsisField.selectedText !== ""
+                                        onClicked: _synopsisField.copy()
+                                        focusPolicy: Qt.NoFocus
+                                    }
+
+                                    VclMenuItem {
+                                        text: "Paste\t" + ActionHub.editOptions.find("paste").shortcut
+                                        onClicked: _synopsisField.paste()
+                                        focusPolicy: Qt.NoFocus
+                                    }
+                                }
+
+                                cursorDelegate: TextEditCursorDelegate {
+                                    textEdit: _synopsisField
+                                }
+
+                                ActionHandler {
+                                    action: ActionHub.editOptions.find("undo")
+                                    enabled: !_synopsisField.readOnly && _synopsisField.activeFocus && _synopsisField.canUndo
+
+                                    onTriggered: () => {
+                                        _synopsisField.undo()
+                                        _synopsisField.textEdited()
+                                    }
+                                }
+
+                                ActionHandler {
+                                    action: ActionHub.editOptions.find("redo")
+                                    enabled: !_synopsisField.readOnly && _synopsisField.activeFocus && _synopsisField.canRedo
+
+                                    onTriggered: () => {
+                                        _synopsisField.redo()
+                                        _synopsisField.textEdited()
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: _synopsisField.hovered || _synopsisField.activeFocus ? 2 : 1
+                            color: Runtime.colors.primary.c500.background
+                        }
+                    }
+
+                    onFocusChanged: Qt.callLater(maybeAssumeFocus)
+                    onItemChanged: Qt.callLater(maybeAssumeFocus)
+
+                    function maybeAssumeFocus() {
+                        if(focus && lod === LodLoader.LOD.High && item)
+                            item.assumeFocus()
+                    }
+                }
+
+                IndexCardFields {
+                    Layout.fillWidth: true
+
+                    lod: _synopsisFieldLoader.lod
+                    visible: hasFields
+                    sanctioned: parent.visible
+
+                    structureElement: root.element
+
+                    tabSequenceEnabled: _private.isStackedOnTop
+                    tabSequenceManager: root.canvasTabSequence
+                    startTabSequence: {
+                        const indexes = root.element.scene.screenplayElementIndexList
+                        if(indexes.length === 0)
+                            return root.elementIndex * _private.nrFocusFieldCount + 2
+
+                        return (indexes[0] + Scrite.document.structure.elementCount) * _private.nrFocusFieldCount + 2
+                    }
+
+                    onFieldAboutToReceiveFocus: Scrite.document.structure.currentElementIndex = root.elementIndex
+                }
+            }
+
+            LodLoader {
+                id: _featuredImageFieldLoader
+
+                lod: _synopsisFieldLoader.lod
+                visible: sanctioned
+                sanctioned: parent.currentIndex === 1
+                resetWidthBeforeLodChange: false
+                resetHeightBeforeLodChange: false
+
+                lowDetailComponent: Image {
+                    id: _lowLodfeaturedImageField
+
+                    property int defaultFillMode: Image.PreserveAspectCrop
+
+                    property string fillModeAttrib: "indexCardFillMode"
+
+                    property Attachments sceneAttachments: root.element.scene.attachments
+                    property Attachment featuredAttachment: sceneAttachments.featuredAttachment
+                    property Attachment featuredImage: featuredAttachment && featuredAttachment.type === Attachment.Photo ? featuredAttachment : null
+
+                    source: featuredImage ? featuredImage.fileSource : ""
+                    mipmap: !(root.canvasScrollMoving || root.canvasScrollFlicking)
+                    fillMode: {
+                        if(!featuredImage)
+                            return defaultFillMode
+                        const ud = featuredImage.userData
+                        if(ud[fillModeAttrib])
+                            return ud[fillModeAttrib] === "fit" ? Image.PreserveAspectFit : Image.PreserveAspectCrop
+                        return defaultFillMode
+                    }
+
+                    Loader {
+                        anchors.fill: parent
+
+                        active: !parent.featuredAttachment
+
+                        sourceComponent: AttachmentsDropArea {
+                            target: _lowLodfeaturedImageField.sceneAttachments
+                            allowedType: Attachments.PhotosOnly
+                            attachmentNoticeSuffix: "Drop this photo to tag it as featured image for this scene."
+
+                            VclLabel {
+                                anchors.centerIn: parent
+
+                                width: parent.width
+
+                                text: "Drag & Drop a Photo"
+                                visible: !parent.active
+                                wrapMode: Text.WordWrap
+                                horizontalAlignment: Text.AlignHCenter
+
+                                font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                            }
+
+                            onDropped: {
+                                attachment.featured = true
+                                allowDrop()
+                            }
+                        }
+                    }
+                }
+
+                highDetailComponent: SceneFeaturedImage {
+                    scene: root.element.scene
+                    mipmap: !(root.canvasScrollMoving || root.canvasScrollFlicking)
+                    fillModeAttrib: "indexCardFillMode"
+                    defaultFillMode: Image.PreserveAspectCrop
+                }
+            }
+        }
+
+        Item {
+            id: _footerRow
+
+            property bool lightBackground: Color.isLight(_footerBg.color)
+
+            Layout.fillWidth: true
+            Layout.preferredHeight: _footerRowLayout.height
+
+            Rectangle {
+                id: _footerBg
+
+                property color baseColor: _background.border.color
+
+                anchors.fill: parent
+                anchors.margins: -5
+
+                color: Runtime.colors.tintTx(baseColor, _private.isSelected ? Runtime.colors.selectedSceneControlTint : Runtime.colors.currentNoteTint)
+            }
+
+            RowLayout {
+                id: _footerRowLayout
+
+                width: parent.width
+                spacing: 5
+
+                SceneTypeImage {
+                    id: _sceneTypeImage
+
+                    Layout.alignment: Qt.AlignBottom
+                    Layout.preferredWidth: 24
+                    Layout.preferredHeight: 24
+
+                    opacity: 0.5
+                    visible: sceneType !== Scene.Standard
+                    sceneType: root.element.scene.type
+                    showTooltip: false
+
+                    lightBackground: _footerRow.lightBackground
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+
+                    spacing: parent.spacing
+
+                    VclLabel {
+                        id: _groupsLabel
+
+                        Layout.fillWidth: true
+
+                        text: Scrite.document.structure.presentableGroupNames(root.element.scene.groups)
+                        color: _footerRow.lightBackground ? "black" : "white"
+                        visible: root.element.scene.groups.length > 0 || !root.element.scene.hasCharacters
+                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                        font.pointSize: Runtime.idealFontMetrics.font.pointSize - 2
+                    }
+
+                    VclLabel {
+                        id: _characterList
+
+                        Layout.fillWidth: true
+
+                        text: {
+                            if(root.element.scene.hasCharacters)
+                                return "<b>Characters</b>: " + root.element.scene.characterNames.join(", ")
+                            return ""
+                        }
+                        color: _footerRow.lightBackground ? "black" : "white"
+                        visible: root.element.scene.hasCharacters
+                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                        font.pointSize: Runtime.idealFontMetrics.font.pointSize - 2
+                    }
+                }
+
+                Item {
+                    id: _dragHandle
+
+                    Layout.preferredWidth: 24
+                    Layout.preferredHeight: 24
+                    Layout.alignment: Qt.AlignBottom
+
+                    Image {
+                        id: _dragHandleImage
+
+                        anchors.fill: parent
+
+                        source: root.element.scene.addedToScreenplay || root.Drag.active ?
+                                    (_footerRow.lightBackground ? Runtime.themedIcon("qrc:/icons/action/view_array.png") : "image://icon/dark/qrc:/icons/action/view_array.png") :
+                                    (_footerRow.lightBackground ? Runtime.themedIcon("qrc:/icons/content/add_circle_outline.png") : "image://icon/dark/qrc:/icons/content/add_circle_outline.png")
+
+                        scale: _dragHandleMouseArea.pressed ? 2 : 1
+                        opacity: _private.isSelected ? 1 : 0.1
+
+                        Behavior on scale {
+                            enabled: Runtime.applicationSettings.enableAnimations
+                            NumberAnimation { duration: Runtime.stdAnimationDuration }
+                        }
+                    }
+
+                    MouseArea {
+                        id: _dragHandleMouseArea
+
+                        anchors.fill: parent
+
+                        drag.target: _dragHandleImage
+                        drag.onActiveChanged: {
+                            _private.isBeingDragged = drag.active
+
+                            if(drag.active)
+                                root.canvasActiveFocusRequest()
+                        }
+
+                        hoverEnabled: !root.canvasScrollFlicking && !root.canvasScrollMoving && _private.isSelected
+
+                        onPressed: {
+                            _private.isBeingDragged = true
+
+                            root.canvasActiveFocusRequest()
+                            root.grabToImage(function(result) {
+                                root.Drag.imageSource = result.url
+                            }, _private.dragImageSize)
+                        }
+                        onReleased: { _private.isBeingDragged = false }
+                        onClicked: {
+                            if(!root.element.scene.addedToScreenplay)
+                                Scrite.document.screenplay.addScene(root.element.scene)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Accept drops for stacking items on top of each other.
+    Rectangle {
+        property real alpha: _dropAreaForStacking.containsDrag ? 0.5 : 0
+
+        anchors.fill: parent
+
+        anchors.margins: -10
+
+        border.width: 2
+        border.color: Color.translucent("black", alpha)
+
+        color: Color.translucent("#cfd8dc", alpha)
+        radius: 6
+        enabled: !_dragHandleMouseArea.drag.active && root.element.scene.addedToScreenplay
+
+        DropArea {
+            id: _dropAreaForStacking
+
+            anchors.fill: parent
+
+            keys: [Runtime.timelineViewSettings.dropAreaKey]
+
+            onDropped: (drop) => {
+                const otherScene = Object.typeOf(drop.source) === "ScreenplayElement" ? drop.source.scene : drop.source
+                if(Scrite.document.screenplay.firstIndexOfScene(otherScene) < 0) {
+                    MessageBox.information("",
+                        "Scenes must be added to the timeline before they can be stacked."
+                    )
+                    drop.accept(Qt.IgnoreAction)
+                    return
+                }
+
+                const otherSceneId = otherScene.id
+                if(otherSceneId === root.element.scene.id) {
+                    drop.accept(Qt.IgnoreAction)
+                    return
+                }
+
+                const otherElement = Scrite.document.structure.findElementBySceneID(otherSceneId)
+                if(otherElement === null) {
+                    drop.accept(Qt.IgnoreAction)
+                    return
+                }
+
+                if(root.element.scene.actIndex < 0 || otherElement.scene.actIndex < 0) {
+                    MessageBox.information("",
+                        "Scenes must be added to the timeline before they can be stacked."
+                    )
+                    drop.accept(Qt.IgnoreAction)
+                    return
+                }
+
+                if(root.element.scene.actIndex !== otherElement.scene.actIndex) {
+                    MessageBox.information("",
+                        "Scenes must belong to the same act for them to be stacked."
+                    )
+                    drop.accept(Qt.IgnoreAction)
+                    return
+                }
+
+                const otherElementIndex = Scrite.document.structure.indexOfElement(otherElement)
+                Qt.callLater( function() { Scrite.document.structure.currentElementIndex = otherElementIndex } )
+
+                const myStackId = root.element.stackId
+                const otherStackId = otherElement.stackId
+                drop.acceptProposedAction()
+
+                if(myStackId === "") {
+                    var uid = SMath.createUniqueId()
+                    root.element.stackId = uid
+                    otherElement.stackId = uid
+                } else {
+                    otherElement.stackId = myStackId
+                }
+
+                Qt.callLater( function() { root.element.stackLeader = true } )
+            }
+        }
+    }
+
+    TrackerPack {
+        delay: 250
+
+        TrackSignal { target: root.element; signal: "stackIdChanged()" }
+        TrackSignal { target: Scrite.document.structure.elementStacks; signal: "objectCountChanged()" }
+        TrackSignal { target: _private.elementStack; signal: "objectCountChanged()" }
+        TrackSignal { target: _private.elementStack; signal: "stackLeaderChanged()" }
+        TrackSignal { target: _private.elementStack; signal: "topmostElementChanged()" }
+
+        onTracked: root.determineElementStack()
+    }
+
+    DelayedProperty {
+        id: _positionBinder
+
+        set: root.element.position
+        initial: Qt.point(root.element.x, root.element.y)
+
+        onGetChanged: {
+            root.x = get.x
+            root.y = get.y
+        }
+    }
+
+    onVisibleChanged: {
+        if(!visible) {
+            if(Scrite.app.hasActiveFocus(Scrite.window,_indexCardLayout))
+                root.canvasTabSequence.releaseFocus()
+        }
+    }
+
+    onFinishEditingRequest: finishEditing()
+
+    QtObject {
+        id: _private
+
+        readonly property size maxDragImageSize: Qt.size(36, 36)
+
+        property size dragImageSize: {
+            const s = root.width > root.height ? maxDragImageSize.width / root.width : maxDragImageSize.height / root.height
+            return Qt.size( root.width*s, root.height*s )
+        }
+
+        property bool isEditing: false
+        property bool isSelected: Scrite.document.structure.currentElementIndex === root.elementIndex
+        property bool isStackedOnTop: (elementStack === null || elementStack.topmostElement === root.element)
+        property bool isBeingDragged: false
+        property bool isVisibleInViewport: true
+
+        property StructureElementStack elementStack
+
+        property int nrFocusFieldCount: {
+            const nrHeadingFields = 1
+            const nrSynopsisFields = Scrite.document.structure.indexCardContent === Structure.Synopsis ? 1 : 0
+            const nrIndexCardFields = Scrite.document.structure.indexCardContent === Structure.Synopsis ? Scrite.document.structure.indexCardFields.length : 0
+            return nrHeadingFields + nrSynopsisFields + nrIndexCardFields
+        }
+
+        onIsSelectedChanged: {
+            if(_private.isSelected && (FocusInspector.hasFocus(Runtime.structureView) || Scrite.document.structure.elementCount === 1))
+                _synopsisFieldLoader.forceActiveFocus()
+            else
+                root.canvasTabSequence.releaseFocus()
+        }
+    }
+}

@@ -1,0 +1,44 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+#ifndef GARBAGECOLLECTOR_H
+#define GARBAGECOLLECTOR_H
+
+#include <QObject>
+
+#include "execlatertimer.h"
+
+/**
+ * We need a class that deletes a QObject much later than what
+ * QObject::deleteLater() does for us. Thats what GarbageCollector
+ * does for us.
+ */
+
+class GarbageCollector : public QObject
+{
+    Q_OBJECT
+
+public:
+    static GarbageCollector *instance();
+    ~GarbageCollector();
+
+    void avoidChildrenOf(QObject *parent);
+    void add(QObject *ptr);
+
+protected:
+    GarbageCollector(QObject *parent = nullptr);
+};
+
+#endif // GARBAGECOLLECTOR_H

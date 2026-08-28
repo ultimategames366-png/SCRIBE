@@ -1,0 +1,171 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../../globals"
+import "../../helpers"
+import "../../controls"
+
+ColumnLayout {
+    id: root
+
+    property scriteObjectConfigField fieldInfo
+    property AbstractReportGenerator report
+
+    property alias characterNames: _characterNameListView.selectedCharacters
+    onCharacterNamesChanged: {
+        if(root.fieldInfo)
+            root.report.setConfigurationValue(root.fieldInfo.name, root.characterNames)
+    }
+
+    onFieldInfoChanged: {
+        _characterNameListView.selectedCharacters = root.report.getConfigurationValue(root.fieldInfo.name)
+        _characterNameListView.visible = _characterNameListView.selectedCharacters.length === 0
+    }
+
+    spacing: 10
+
+    VclLabel {
+        Layout.fillWidth: true
+
+        elide: Text.ElideRight
+        wrapMode: Text.WordWrap
+        maximumLineCount: 2
+
+        text: root.fieldInfo.label
+    }
+
+    Loader {
+        id: _fieldTitleText
+
+        Layout.fillWidth: true
+        Layout.rightMargin: 30
+
+        sourceComponent: Flow {
+            spacing: 5
+            flow: Flow.LeftToRight
+
+            VclLabel {
+                id: _charactersPrefix
+                text: root.characterNames.length === 0 ? "No Characters Selected" : "»"
+                topPadding: 0
+                bottomPadding: 5
+            }
+
+            Repeater {
+                model: root.characterNames
+
+                delegate: Item {
+                    required property int index
+                    required property string modelData
+
+                    width: _characterName.width
+                    height: _charactersPrefix.height
+
+                    TagText {
+                        id: _characterName
+
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        border.width: 1
+                        border.color: textColor
+                        color: Runtime.colors.scheme === Qt.ColorScheme.Dark ? Qt.rgba(1, 1, 1, containsMouse ? 0.5 : 0.25) : Qt.rgba(0, 0, 0, containsMouse ? 0.25 : 0.1)
+                        textColor: Runtime.colors.scheme === Qt.ColorScheme.Dark ? "white" : "black"
+                        text: parent.modelData
+                        leftPadding: 10
+                        rightPadding: 10
+                        topPadding: 5
+                        bottomPadding: 5
+                        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                        closable: true
+                        onCloseRequest: {
+                            let list = _characterNameListView.selectedCharacters
+                            list.splice( list.indexOf(text), 1 )
+                            _characterNameListView.selectedCharacters = list
+                        }
+                    }
+                }
+            }
+
+            Image {
+                source: Runtime.themedIcon("qrc:/icons/content/add_box.png")
+                width: _charactersPrefix.height
+                height: _charactersPrefix.height
+                opacity: 0.5
+                visible: !_characterNameListView.visible
+
+                MouseArea {
+                    id: _addAnotherCharacterMouseArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onContainsMouseChanged: parent.opacity = containsMouse ? 1 : 0.5
+                    onClicked: _characterNameListView.visible = true
+
+                    ToolTipPopup {
+                        container: _addAnotherCharacterMouseArea
+                        text: "Add another character."
+                        visible: _addAnotherCharacterMouseArea.containsMouse
+                    }
+                }
+            }
+
+            Image {
+                source: Runtime.themedIcon("qrc:/icons/content/clear_all.png")
+                width: _charactersPrefix.height
+                height: _charactersPrefix.height
+                opacity: 0.5
+                visible: _characterNameListView.selectedCharacters.length > 0
+
+                MouseArea {
+                    id: _clearAllMouseArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+
+                    onContainsMouseChanged: parent.opacity = containsMouse ? 1 : 0.5
+                    onClicked: {
+                        _characterNameListView.selectedCharacters = []
+                        _characterNameListView.visible = true
+                    }
+
+                    ToolTipPopup {
+                        container: _clearAllMouseArea
+                        text: "Remove all characters and start fresh."
+                        visible: _clearAllMouseArea.containsMouse
+                    }
+                }
+            }
+        }
+    }
+
+    CharactersView {
+        id: _characterNameListView
+
+        Layout.fillWidth: true
+        Layout.leftMargin: 5
+        Layout.rightMargin: 30
+        Layout.preferredHeight: 280
+    }
+}
+

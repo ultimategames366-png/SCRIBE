@@ -1,0 +1,96 @@
+# C++ objects and libs
+*.slo
+*.lo
+*.o
+*.a
+*.la
+*.lai
+*.so
+*.so.*
+*.dll
+*.dylib
+
+# Qt-es
+object_script.*.Release
+object_script.*.Debug
+*_plugin_import.cpp
+/.qmake.cache
+/.qmake.stash
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+Makefile*
+*build-*
+*.qm
+*.prl
+apps/desktop/src/core/languageengine_p.h
+
+# Qt unit tests
+target_wrapper.*
+
+# QtCreator
+*.autosave
+
+# QtCreator Qml
+*.qmlproject.user
+*.qmlproject.user.*
+
+# QtCreator CMake
+CMakeLists.txt.user*
+
+# QtCreator 4.8< compilation database
+compile_commands.json
+
+# QtCreator local machine specific files for imported projects
+*creator.user*
+
+*_qmlcache.qrc
+
+# Temporary files from Office
+~$*.pptx
+~$*.docx
+~$*.pdf
+
+binary/*
+build/*
+
+thirdparty/static/quazip/.vcpkg
+thirdparty/static/quazip/vcpkg_installed
+
+# Language Server
+.qmlls.ini
+
+# IDE and editor local config
+.vscode/
+.claude/
+
+# Node.js dependencies for scripts
+/tools/codingstyle/node_modules
+/tools/codingstyle/package.json
+/tools/codingstyle/package-lock.json
+
+# Mkdocs environment
+/docs/userguide/venv/
+/docs/userguide/site/
+/docs/userguide/site.zip
+/docs/userguide/__pycache__/
+
+# Packaging (local credentials, staging directories, and build artifacts)
+packaging/packaging.config.local
+packaging/packaging.config.local.bat
+packaging/_staging/
+packaging/assets/mac/background.png
+packaging/assets/*/license.txt
+binary/packages/
+
+# Production-only Windows version resource (provided by the production build system)
+apps/desktop/version.rc.in
+

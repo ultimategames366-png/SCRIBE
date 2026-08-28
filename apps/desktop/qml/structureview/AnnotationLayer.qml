@@ -1,0 +1,257 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Window
+import QtQuick.Layouts
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+import "../helpers"
+import "../dialogs"
+import "../overlays"
+import "./annotations"
+
+Item {
+    id: root
+
+    required property VclMenu canvasContextMenu
+
+    readonly property var availableAnnotationKeys: AnnotationFactory.keys
+
+    required property bool canvasScrollMoving
+    required property bool canvasScrollFlicking
+
+    required property real canvasScale
+    required property rect canvasScrollViewportRect
+    required property BoundingBoxEvaluator canvasItemsBoundingBox
+
+    signal canvasActiveFocusRequest()
+    signal ensureAreaVisibleRequest(rect area)
+    signal canvasScaleSettled()
+
+    onCanvasScaleChanged: zoomSettleTimer.restart()
+
+    Timer {
+        id: zoomSettleTimer
+        interval: 300
+        repeat: false
+        onTriggered: root.canvasScaleSettled()
+    }
+
+    property AnnotationGrip grip: _gripLoader.item as AnnotationGrip
+
+    function createAnnotation(type, x, y) {
+        return _private.createAnnotation(type, x, y)
+    }
+
+    function dropRectangleAnnotation(x, y, w, h) {
+        let rectAnnot = _private.createAnnotation("rectangle", x, y)
+        rectAnnot.place(x, y, w, h)
+        return rectAnnot
+    }
+
+    function dropImageAnnotation(x, y, imagePath) {
+        let imageAnnot = _private.createAnnotation("image", x, y)
+        imageAnnot.setAttribute("image", imageAnnot.addImage(imagePath))
+        return imageAnnot
+    }
+
+    function snapAnnotationToGrid(annotation) {
+        if(annotation) {
+            const rect = annotation.geometry
+            var gx = Scrite.document.structure.snapToGrid(rect.x)
+            var gy = Scrite.document.structure.snapToGrid(rect.y)
+            var gw = Scrite.document.structure.snapToGrid(rect.width)
+            var gh = Scrite.document.structure.snapToGrid(rect.height)
+            annotation.geometry = Qt.rect(gx, gy, gw, gh)
+        }
+    }
+
+    function resetGrip() {
+        _gripLoader.reset()
+    }
+
+    Behavior on opacity {
+        enabled: Runtime.applicationSettings.enableAnimations
+
+        NumberAnimation { duration: Runtime.stdAnimationDuration }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+
+        enabled: _gripLoader.active
+
+        onClicked: _gripLoader.reset()
+    }
+
+    StructureCanvasViewportFilterModel {
+        id: _annotationsFilterModel
+
+        type: StructureCanvasViewportFilterModel.AnnotationType
+        enabled: Scrite.document.loading ? false : Scrite.document.structure.annotationCount > 100
+        structure: Scrite.document.structure
+        viewportRect: root.canvasScrollViewportRect
+        filterStrategy: StructureCanvasViewportFilterModel.IntersectsStrategy
+        computeStrategy: StructureCanvasViewportFilterModel.PreComputeStrategy
+    }
+
+    Repeater {
+        id: _annotationItems
+
+        model: _annotationsFilterModel
+
+        delegate: Item {
+            id: _annotationDelegateContainer
+
+            required property int index
+            required property var modelData
+
+            property int annotationIndex: index
+            property Annotation annotation: modelData
+            property bool active: !_annotationsFilterModel.enabled
+            property AbstractAnnotationDelegate delegate: null
+
+            Component.onCompleted: getReady()
+
+            visible: active
+
+            onActiveChanged: getReady()
+
+            function getReady() {
+                if(active) {
+                    delegate = _private.createAnnotationDelegate(annotation, annotationIndex, _annotationDelegateContainer)
+                } else {
+                    delegate.destroy()
+                    delegate = null
+                }
+            }
+        }
+    }
+
+    Loader {
+        id: _gripLoader
+
+        property Item annotationItem
+        property Annotation annotation
+
+        Component.onDestruction: reset()
+
+        active: annotation !== null && annotationItem !== null
+        sourceComponent: AnnotationGrip {
+            annotation: _gripLoader.annotation
+            annotationItem: _gripLoader.annotationItem
+            annotationContainer: root
+            structureCanvasScale: root.canvasScale
+
+            onResetRequest: _gripLoader.reset()
+            onSnapToGridRequest: root.snapAnnotationToGrid(annotation)
+            onRequestCanvasFocus: root.canvasActiveFocusRequest()
+        }
+
+        function reset() {
+            root.snapAnnotationToGrid(annotation)
+            annotation = null
+            annotationItem = null
+        }
+
+        Connections {
+            target: Scrite.document.structure
+
+            function onCurrentElementIndexChanged() {
+                if(Scrite.document.structure.currentElementIndex >= 0)
+                    _gripLoader.reset()
+            }
+
+            function onAnnotationCountChanged() {
+                _gripLoader.reset()
+            }
+        }
+
+        Connections {
+            target: Scrite.document.screenplay
+
+            function onCurrentElementIndexChanged(val) {
+                let element = Scrite.document.screenplay.elementAt(Scrite.document.screenplay.currentElementIndex)
+                let info = Scrite.document.structure.queryBreakElements(element)
+                if(info.indexes && info.indexes.length > 0) {
+                    let fi = info.indexes[0]
+                    let fe = Scrite.document.structure.elementAt(fi)
+                    if(fe === null)
+                        return
+
+                    let area = fe.geometry
+                    let topPadding = element.breakType === Screenplay.Episode ? 150 : 90
+
+                    area = Qt.rect(area.x-50, area.y-topPadding, area.width, area.height)
+                    root.ensureAreaVisibleRequest(area)
+                }
+            }
+        }
+
+        onAnnotationChanged: {
+            AnnotationPropertyEditorDock.annotation = annotation
+            if(annotation === null)
+                annotationItem = null
+        }
+    }
+
+    QtObject {
+        id: _private
+
+        function createAnnotation(type, x, y) {
+            if(Scrite.document.readOnly)
+                return null
+
+            return AnnotationFactory.create(type, x, y, root)
+        }
+
+        function getAnnotationDelegate(type) {
+            return AnnotationFactory.delegateFor(type)
+        }
+
+        function createAnnotationDelegate(annotation, annotationIndex, parent) {
+            let delegate = AnnotationFactory.createDelegate(annotation, annotationIndex, parent)
+            if(delegate) {
+                delegate.currentAnnotationItem = Qt.binding( () => { return _gripLoader.annotationItem } )
+                delegate.canvasScrollMoving = Qt.binding( () => { return root.canvasScrollMoving } )
+                delegate.canvasScrollFlicking = Qt.binding( () => { return root.canvasScrollFlicking } )
+                delegate.canvasScale = Qt.binding( () => { return root.canvasScale } )
+                delegate.BoundingBoxItem.evaluator = root.canvasItemsBoundingBox
+                delegate.BoundingBoxItem.livePreview = true
+                delegate.gripRequest.connect(_private.gripDelegate)
+
+                root.canvasScaleSettled.connect(delegate.canvasScaleSettled)
+                Qt.callLater(delegate.canvasScaleSettled) // First call
+                root.canvasItemsBoundingBox.recomputeBoundingBox()
+            }
+            return delegate
+        }
+
+        function gripDelegate(delegate, annotation) {
+            _gripLoader.reset()
+            _gripLoader.annotationItem = delegate
+            _gripLoader.annotation = annotation
+        }
+    }
+}
+

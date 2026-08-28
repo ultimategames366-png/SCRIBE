@@ -1,0 +1,345 @@
+{
+   "#revision":2,
+   "oval":[
+      {
+         "name":"fillBackground",
+         "title":"Fill Background",
+         "text":"Fill with 'Color'",
+         "type":"boolean",
+         "default":true,
+         "cache":true
+      },
+      {
+         "name":"color",
+         "title":"Color",
+         "type":"color",
+         "default":"white",
+         "cache":true
+      },
+      {
+         "name":"borderColor",
+         "title":"Border Color",
+         "type":"color",
+         "default":"black",
+         "cache":true
+      },
+      {
+         "name":"borderWidth",
+         "title":"Border Width",
+         "type":"number",
+         "default":1,
+         "step":1,
+         "min":0,
+         "max":5,
+         "cache":true
+      },
+      {
+         "name":"opacity",
+         "title":"Opacity",
+         "type":"number",
+         "default":50,
+         "step":10,
+         "min":0,
+         "max":100,
+         "cache":true
+      }
+   ],
+   "rectangle":[
+      {
+         "name":"fillBackground",
+         "title":"Fill Background",
+         "text":"Fill with 'Color'",
+         "type":"boolean",
+         "default":true,
+         "cache":true
+      },
+      {
+         "name":"color",
+         "title":"Color",
+         "type":"color",
+         "default":"white",
+         "cache":true
+      },
+      {
+         "name":"borderColor",
+         "title":"Border Color",
+         "type":"color",
+         "default":"black",
+         "cache":true
+      },
+      {
+         "name":"borderWidth",
+         "title":"Border Width",
+         "type":"number",
+         "default":1,
+         "step":1,
+         "min":0,
+         "max":5,
+         "cache":true
+      },
+      {
+         "name":"opacity",
+         "title":"Opacity",
+         "type":"number",
+         "default":50,
+         "step":10,
+         "min":0,
+         "max":100,
+         "cache":true
+      }
+   ],
+   "text":[
+      {
+         "name":"text",
+         "title":"Text",
+         "type":"text",
+         "default":"Text",
+         "cache":false
+      },
+      {
+         "name":"textColor",
+         "title":"Text Color",
+         "type":"color",
+         "default":"black",
+         "cache":true
+      },
+      {
+         "name":"fontFamily",
+         "title":"Font Family",
+         "type":"fontFamily",
+         "default":"Impact",
+         "cache":true
+      },
+      {
+         "name":"fontSize",
+         "title":"Font Size",
+         "type":"number",
+         "default":16,
+         "min":9,
+         "max":72,
+         "step":1,
+         "cache":true
+      },
+      {
+         "name":"fontStyle",
+         "title":"Font Style",
+         "type":"fontStyle",
+         "default":[
+
+         ],
+         "cache":true
+      },
+      {
+         "name":"hAlign",
+         "title":"Horizontal Alignment",
+         "type":"hAlign",
+         "default":"center",
+         "cache":true
+      },
+      {
+         "name":"vAlign",
+         "title":"Vertical Alignment",
+         "type":"vAlign",
+         "default":"center",
+         "cache":true
+      },
+      {
+         "name":"fillBackground",
+         "title":"Fill Background",
+         "text":"Fill with 'Background Color'",
+         "type":"boolean",
+         "default":false,
+         "cache":true
+      },
+      {
+         "name":"backgroundColor",
+         "title":"Background Color",
+         "type":"color",
+         "default":"white",
+         "cache":true
+      },
+      {
+         "name":"borderColor",
+         "title":"Border Color",
+         "type":"color",
+         "default":"black",
+         "cache":true
+      },
+      {
+         "name":"borderWidth",
+         "title":"Border Width",
+         "type":"number",
+         "default":0,
+         "step":1,
+         "min":0,
+         "max":5,
+         "cache":true
+      },
+      {
+         "name":"opacity",
+         "title":"Opacity",
+         "type":"number",
+         "default":100,
+         "step":10,
+         "min":0,
+         "max":100,
+         "cache":true
+      }
+   ],
+   "url":[
+      {
+         "name":"imageName",
+         "title":"Image",
+         "type":"image",
+         "default":"",
+         "isFile":true,
+         "cache":false,
+         "visible":false
+      },
+      {
+         "name":"url",
+         "title":"Website Address",
+         "type":"url",
+         "default":"",
+         "cache":false
+      },
+      {
+         "name":"title",
+         "title":"Title",
+         "type":"text",
+         "default":"",
+         "placeHolderText":"Set website title",
+         "cache":false
+      },
+      {
+         "name":"description",
+         "title":"Description",
+         "type":"text",
+         "default":"",
+         "placeHolderText":"Set website description",
+         "cache":false
+      },
+      {
+         "name":"imageUrl",
+         "title":"Image URL",
+         "type":"url",
+         "default":"",
+         "placeHolderText":"Set preview image URL",
+         "cache":false
+      }
+   ],
+   "image":[
+      {
+         "name":"image",
+         "title":"Image",
+         "type":"image",
+         "default":"",
+         "isFile":true,
+         "cache":false
+      },
+      {
+         "name":"caption",
+         "title":"Caption",
+         "type":"text",
+         "default":"",
+         "cache":false
+      },
+      {
+         "name":"captionColor",
+         "title":"Caption Text Color",
+         "type":"color",
+         "default":"black",
+         "cache":true
+      },
+      {
+         "name":"captionAlignment",
+         "title":"Caption Alignment",
+         "type":"hAlign",
+         "default":"center",
+         "cache":true
+      },
+      {
+         "name":"fillBackground",
+         "title":"Fill Background",
+         "text":"Fill with 'Background Color'",
+         "type":"boolean",
+         "default":false,
+         "cache":true
+      },
+      {
+         "name":"backgroundColor",
+         "title":"Background Color",
+         "type":"color",
+         "default":"white",
+         "cache":true
+      },
+      {
+         "name":"borderColor",
+         "title":"Border Color",
+         "type":"color",
+         "default":"black",
+         "cache":true
+      },
+      {
+         "name":"borderWidth",
+         "title":"Border Width",
+         "type":"number",
+         "default":0,
+         "step":1,
+         "min":0,
+         "max":5,
+         "cache":true
+      },
+      {
+         "name":"opacity",
+         "title":"Opacity",
+         "type":"number",
+         "default":100,
+         "step":10,
+         "min":0,
+         "max":100,
+         "cache":true
+      }
+   ],
+   "line":[
+      {
+         "name":"orientation",
+         "title":"Orientation",
+         "type":"choice",
+         "choices":[
+            "Horizontal",
+            "Vertical"
+         ],
+         "default":"Horizontal",
+         "visible":false,
+         "cache":false
+      },
+      {
+         "name":"lineColor",
+         "title":"Line Color",
+         "type":"color",
+         "default":"black",
+         "cache":true
+      },
+      {
+         "name":"lineWidth",
+         "title":"Line Width",
+         "type":"number",
+         "default":4,
+         "step":1,
+         "min":1,
+         "max":20,
+         "cache":true
+      },
+      {
+         "name":"opacity",
+         "title":"Opacity",
+         "type":"number",
+         "default":100,
+         "step":10,
+         "min":0,
+         "max":100,
+         "cache":true
+      }
+   ]
+}

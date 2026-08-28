@@ -1,0 +1,184 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import QtQuick.Controls.Material
+
+import io.scrite.components
+
+import "../globals"
+import "../dialogs"
+import "../helpers"
+import "../controls"
+import "./scenelistpanel"
+
+Item {
+    id: root
+
+    required property bool readOnly
+    required property ScreenplayAdapter screenplayAdapter
+
+    property alias expanded: _sidePanel.expanded
+    property alias minPanelWidth: _sidePanel.minPanelWidth
+    property alias maxPanelWidth: _sidePanel.maxPanelWidth
+
+    signal positionScreenplayEditorAtTitlePage()
+
+    width: _sidePanel.width
+
+    SidePanel {
+        id: _sidePanel
+
+        height: parent.height
+
+        z: expanded ? 1 : 0
+
+        label: ""
+        buttonY: 20
+        maxPanelWidth: Runtime.screenplayEditorSettings.sidePanelWidth
+
+        content: root.screenplayAdapter.elementCount === 0 ? _private.emptyScreenplayContent : _private.filledScreenplayContent
+    }
+
+    QtObject {
+        id: _private
+
+        readonly property Component emptyScreenplayContent: Item {
+            VclLabel {
+                anchors.top: parent.top
+                anchors.topMargin: 50
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                width: parent.width * 0.9
+
+                text: "Scene headings will be listed here as you add them into your screenplay."
+                visible: root.screenplayAdapter.elementCount === 0
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+            }
+        }
+
+        readonly property Component filledScreenplayContent: FocusScope {
+            ColumnLayout {
+                anchors.fill: parent
+
+                spacing: 0
+
+                SceneListPanelHeader {
+                    Layout.fillWidth: true
+
+                    leftPadding: 10
+                    rightPadding: 10
+
+                    onClicked: {
+                        if(root.screenplayAdapter.isSourceScreenplay)
+                            root.screenplayAdapter.screenplay.clearSelection()
+                        root.screenplayAdapter.currentIndex = -1
+
+                        root.positionScreenplayEditorAtTitlePage()
+                    }
+                }
+
+                Loader {
+                    id: _sceneListPanelLoader
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    sourceComponent: _sceneListPanel
+
+                    property bool displayTracks: Runtime.sceneListPanelSettings.displayTracks && Runtime.appFeatures.structure.enabled && Runtime.screenplayTracksSettings.displayTracks
+                    onDisplayTracksChanged: {
+                        active = false
+                        Qt.callLater( () => { active = true } )
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: _sceneListPanel
+
+        RowLayout {
+            spacing: 0
+
+            ScreenplayTracksView {
+                id: _screenplayTracksView
+
+                Layout.fillHeight: true
+
+                DelayedProperty.initial: 0
+                DelayedProperty.delay: 10
+                DelayedProperty.set: _sceneListView.delegateCount
+
+                enabled: Math.abs(DelayedProperty.get - root.screenplayAdapter.elementCount) < 2
+                visible: Runtime.sceneListPanelSettings.displayTracks && Runtime.screenplayTracksSettings.displayTracks && root.screenplayAdapter.isSourceScreenplay
+                listView: _sceneListView
+                screenplay: root.screenplayAdapter.screenplay
+
+                property var __watch: [Runtime.sceneListPanelSettings.sceneTextMode, Runtime.screenplayEditorSettings.slpSynopsisLineCount]
+                on__WatchChanged: Qt.callLater(_sceneListView.updateCacheBuffer)
+            }
+
+            SceneListPanel {
+                id: _sceneListView
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                readOnly: root.readOnly
+                screenplayAdapter: root.screenplayAdapter
+                tracksVisible: _screenplayTracksView.visible
+
+                onCollapseSidePanelRequest: () => { _sidePanel.expanded = false }
+
+                ToolTipPopup {
+                    background: Rectangle {
+                        color: Runtime.colors.accent.c500.background
+                        opacity: 0.9
+                    }
+
+                    delay: 0
+                    text: {
+                        const sceneGroup = _sceneListView.sceneGroup
+                        const fields = [
+                                         sceneGroup.sceneCount + " scene(s)",
+                                         "<b>Duration</b> " + (sceneGroup.evaluatingLengths ? "...." : TMath.timeLengthString(sceneGroup.timeLength)),
+                                         "<b>Page Count</b> " + (sceneGroup.evaluatingLengths ? "...." : sceneGroup.pageCount + " or " + sceneGroup.pageLength1_8 + " page(s)")
+                                     ]
+                        return "<p>Scene Selection:</p>" + SMath.formatAsBulletPoints(fields)
+                    }
+                    textColor: Runtime.colors.accent.c500.text
+                    visible: Runtime.sceneListPanelSettings.showTooltip && _sceneListView.sceneGroup.evaluateLengths && _sceneListView.sceneGroup.sceneCount >= 2
+                    parseShortcutInText: false
+                }
+            }
+        }
+    }
+
+    Component {
+        id: _sceneTreePanel
+
+        Item {
+            // TODO:
+        }
+    }
+}

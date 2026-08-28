@@ -1,0 +1,271 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Window
+import QtQuick.Layouts
+
+import io.scrite.components
+
+import "./tasks"
+
+import "./globals"
+import "./dialogs"
+import "./helpers"
+import "./controls"
+import "./mainwindow"
+import "./notifications"
+import "./screenplayeditor"
+import "./floatingdockpanels"
+
+Item {
+    id: root
+
+    width: 1350
+    height: 700
+
+    enabled: !Scrite.document.loading
+
+    ColumnLayout {
+        id: _layout
+
+        anchors.fill: parent
+
+        spacing: 0
+
+        Loader {
+            id: _promoTextLoader
+
+            Layout.fillWidth: true
+            Layout.preferredHeight: Runtime.idealFontMetrics.lineSpacing * 2
+            active: Scrite.user.promotionText !== ""
+            visible: active
+
+            sourceComponent: Rectangle {
+                id: _promoText
+
+                color: Runtime.colors.accent.c900.background
+
+                RowLayout {
+                    id: _promoTextLayout
+
+                    anchors.centerIn: parent
+
+                    spacing: 10
+
+                    VclText {
+                        text: Scrite.user.promotionText
+                        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                        color: Runtime.colors.accent.c900.text
+                    }
+
+                    VclText {
+                        text: Scrite.user.promotionButton.text
+                        font.pointSize: Runtime.idealFontMetrics.font.pointSize
+                        font.underline: true
+                        color: Runtime.colors.accent.c900.text
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: {
+                        const button = Scrite.user.promotionButton
+                        if(button.action === UserMessageButton.UrlAction) {
+                            Qt.openUrlExternally(button.endpoint)
+                        } else if(button.action === UserMessageButton.CommandAction) {
+                            UserAccountDialog.handleMessageEndpoint(button.endpoint)
+                        } else {
+                            UserAccountDialog.launch("Subscriptions") // Safe default
+                        }
+
+                        _promoTextLoader.active = false
+                    }
+                }
+            }
+        }
+
+        Header {
+            id: _header
+
+            Layout.fillWidth: true
+
+            z: 1
+
+            ActionHandler {
+                action: ActionHub.applicationOptions.find("toggleToolbarVisibility")
+
+                checked: _header.visible
+                onToggled: () => {
+                               Qt.callLater(_header.toggleVisibility)
+                           }
+            }
+
+            function toggleVisibility() {
+                visible = !visible
+            }
+        }
+
+        Workspace {
+            id: _workspace
+
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            z: 0
+        }
+    }
+
+    ReloadPromptDialog { }
+
+    QtObject {
+        id: _private
+
+        readonly property Component helpTipNotification: HelpTipNotification {
+            id: _helpTip
+
+            Notification.onDismissed: _helpTip.destroy()
+        }
+
+        readonly property Connections userConnections: Connections {
+            target: Scrite.user
+
+            function onRequestVersionTypeAccess() {
+                RequestVersionTypeAccess.launch()
+            }
+        }
+
+        property bool handleCloseEvent: true
+        property bool hasDocumentErrors: documentErrors.hasError
+        property bool hasApplicationErrors: applicationErrors.hasError
+
+        property ErrorReport documentErrors: Aggregation.errorReport(Scrite.document)
+        property ErrorReport applicationErrors: Aggregation.errorReport(Scrite.app)
+
+        function handleOpenFileRequest(fileName) {
+            if(Platform.isMacOSDesktop) {
+                if(Scrite.document.empty) {
+                    Runtime.shoutout(Runtime.announcementIds.closeHomeScreenRequest, undefined)
+                    OpenFileTask.open(fileName)
+                } else {
+                    let fileInfoObj = Qt.createQmlObject("import io.scrite.components; BasicFileInfo { }", _private)
+                    let fileInfo = fileInfoObj as BasicFileInfo
+                    fileInfo.absoluteFilePath = fileName
+
+                    const justFileName = fileInfo.baseName
+                    fileInfo.destroy()
+
+                    MessageBox.question("Open Options",
+                                        "How do you want to open <b>" + justFileName + "</b>?",
+                                        ["This Window", "New Window"], (answer) => {
+                                            if(answer === "This Window")
+                                                OpenFileTask.open(fileName)
+                                            else
+                                                Scrite.app.launchNewInstanceAndOpen(Scrite.window, fileName);
+                                        })
+                }
+            }
+        }
+
+        function showHelpTip(tipName) {
+            if(Runtime.helpTips && Runtime.helpTips[tipName] !== undefined && !Runtime.helpNotificationSettings.isTipShown(tipName)) {
+                helpTipNotification.createObject(Scrite.window.contentItem, {"tipName": tipName})
+            }
+        }
+
+        function maybeShowDiscordHelpTip() {
+            if(Runtime.helpNotificationSettings.dayZero === "")
+               Runtime.helpNotificationSettings.dayZero = new Date()
+
+            const days = Runtime.helpNotificationSettings.daysSinceZero()
+            if(days >= 2) {
+                if(!Runtime.helpNotificationSettings.isTipShown("discord"))
+                    showHelpTip("discord")
+            }
+        }
+
+        function handleWindowClosing(ce) {
+            let closeEvent = ce as CloseEvent
+            if(!Scrite.window.closeButtonVisible) {
+                closeEvent.accepted = false
+                return
+            }
+
+            if(!Scrite.user.canUseAppVersionType) {
+                closeEvent.accepted = true
+                return
+            }
+
+            if(handleCloseEvent) {
+                closeEvent.accepted = false
+
+                Scrite.app.saveWindowGeometry(Scrite.window, "Workspace")
+
+                SaveFileTask.save( () => {
+                                      _private.handleCloseEvent = false
+                                      if( TrialNotActivatedDialog.launch() !== null)
+                                        return
+
+                                      Qt.callLater(Scrite.window.close)
+                                  } )
+            } else
+                closeEvent.accepted = true
+        }
+
+        Announcement.onIncoming: (type, data) => {
+                                     if(type === Runtime.announcementIds.showHelpTip) {
+                                         _private.showHelpTip(""+data)
+                                     }
+                                 }
+
+        Component.onCompleted: {
+            Scrite.window.closing.connect(handleWindowClosing)
+
+            if(Platform.isMacOSDesktop)
+                Scrite.app.openFileRequest.connect(handleOpenFileRequest)
+
+            Qt.callLater(maybeShowDiscordHelpTip)
+
+            if(!Scrite.app.restoreWindowGeometry(Scrite.window, "Workspace"))
+                Runtime.workspaceSettings.screenplayEditorWidth = -1
+
+            _workspace.reset()
+        }
+
+        onHasApplicationErrorsChanged: {
+            if(hasApplicationErrors)
+                MessageBox.information("Scrite Error", applicationErrors.errorMessage, applicationErrors.clear)
+        }
+
+        onHasDocumentErrorsChanged: {
+            if(hasDocumentErrors) {
+                var msg = documentErrors.errorMessage;
+
+                const details = documentErrors.details || {}
+                if(details && details.revealOnDesktopRequest)
+                    msg += "<br/><br/>Click Ok to reveal <u>" + details.revealOnDesktopRequest + "</u> on your computer."
+
+                MessageBox.information("Scrite Document Error", msg, () => {
+                                           if(details && details.revealOnDesktopRequest)
+                                               File.revealOnDesktop(details.revealOnDesktopRequest)
+                                           documentErrors.clear()
+                                       })
+            }
+        }
+    }
+}

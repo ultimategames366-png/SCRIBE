@@ -1,0 +1,124 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+
+import io.scrite.components
+
+import "../globals"
+import "../controls"
+
+Item {
+    id: root
+
+    property alias topPadding: _text.topPadding
+    property alias leftPadding: _text.leftPadding
+    property alias rightPadding: _text.rightPadding
+    property alias bottomPadding: _text.bottomPadding
+
+    property alias text: _text.text
+    property alias font: _text.font
+    property alias color: _background.color
+    property alias border: _background.border
+    property alias closable: _closeButtonLoader.active
+    property alias textColor: _text.color
+    property alias hoverEnabled: _mouseArea.hoverEnabled
+    property alias containsMouse: _mouseArea.containsMouse
+
+    signal clicked()
+    signal closeRequest()
+
+    implicitWidth: _layout.width
+    implicitHeight: _layout.height
+
+    Rectangle {
+        id: _background
+
+        anchors.fill: _layout
+
+        color: Runtime.colors.primary.c10.background
+        radius: height/2
+
+        border.width: 1
+        border.color: _text.color
+    }
+
+    Row {
+        id: _layout
+
+        anchors.verticalCenter: parent.verticalCenter
+
+        Text {
+            id: _text
+
+            anchors.verticalCenter: parent.verticalCenter
+
+            padding: 4
+            font.pointSize: Runtime.idealFontMetrics.font.pointSize
+
+            MouseArea {
+                id: _mouseArea
+
+                anchors.fill: parent
+
+                hoverEnabled: true
+
+                onClicked: root.clicked()
+            }
+        }
+
+        Loader {
+            id: _closeButtonLoader
+
+            anchors.verticalCenter: parent.verticalCenter
+
+            width: _text.contentHeight * 1.25
+            height: _text.contentHeight
+            active: false
+            visible: active
+
+            sourceComponent: Item {
+                Rectangle {
+                    width: parent.height
+                    height: parent.height
+
+                    color: _closeButtonMouseArea.pressed ? Runtime.colors.accent.c600.background : Runtime.colors.accent.c100.background
+                    radius: height/2
+
+                    Image {
+                        anchors.centerIn: parent
+
+                        width: height
+                        height: parent.height * 0.8
+
+                        source: _closeButtonMouseArea.pressed ? "image://icon/dark/qrc:/icons/navigation/close.png" : Runtime.themedIcon("qrc:/icons/navigation/close.png")
+                        smooth: true
+                    }
+
+                    MouseArea {
+                        id: _closeButtonMouseArea
+
+                        anchors.fill: parent
+
+                        onClicked: root.closeRequest()
+                    }
+                }
+            }
+        }
+    }
+}

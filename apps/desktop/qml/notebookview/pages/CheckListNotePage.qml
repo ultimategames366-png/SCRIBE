@@ -1,0 +1,55 @@
+/****************************************************************************
+**
+** Copyright (C) 2020 Prashanth N Udupa
+** Author: Prashanth N Udupa (prashanth@scrite.io,
+**                            prashanth.udupa@gmail.com,
+**                            prashanth@vcreatelogic.com)
+**
+** This code is distributed under GPL v3. Complete text of the license
+** can be found here: https://www.gnu.org/licenses/gpl-3.0.txt
+**
+** This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
+** WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+**
+****************************************************************************/
+
+import QtQml
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+import io.scrite.components
+
+import "../../helpers"
+import ".."
+import "../helpers"
+
+AbstractNotePage {
+    id: root
+
+    ColumnLayout {
+        anchors.fill: parent
+
+        CheckListView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            note: root.note
+        }
+
+        AttachmentsView {
+            Layout.fillWidth: true
+
+            attachments: root.note ? root.note.attachments : null
+        }
+    }
+
+    AttachmentsDropArea {
+        id: _dropArea
+
+        anchors.fill: parent
+
+        allowMultiple: true
+        target: root.note ? root.note.attachments : null
+    }
+}
